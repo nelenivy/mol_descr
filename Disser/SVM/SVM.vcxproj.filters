@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="Kernels\basic_kernels.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="Kernels\kernels_for_points.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="Kernels\pharmacophore_kernel_calculator.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="Kernels\pharm_kernel_seq_calc.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="Kernels\gramm_matrix_cache.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="element_with_index_and_id.h" />
+    <ClInclude Include="modified_grid_search.h" />
+    <ClInclude Include="kernel_svm_trainer_manager.h" />
+    <ClInclude Include="descriptor_svm_trainer.h" />
+    <ClInclude Include="Kernels\cached_kernel.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="cross_validation_svm_trainer.h" />
+    <ClInclude Include="mgua.h" />
+    <ClInclude Include="prepare_data_for_svm.h" />
+    <ClInclude Include="zero_one_loss_fuzzy.h" />
+    <ClInclude Include="general_cross_validation.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Kernels">
+      <UniqueIdentifier>{2302de08-9508-4cca-88ed-3d410cee6d68}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Kernels\descriptor_svm_trainer.cpp" />
+    <ClCompile Include="mgua.cpp" />
+  </ItemGroup>
+</Project>

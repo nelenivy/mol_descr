@@ -1,0 +1,1 @@
+E:\Disser\Programs\Disser\bin\x64_Debug\Disser.exe -mol_folder E:\Disser\Tests\glik110 -mol_prefix glik -distances_intervals 5

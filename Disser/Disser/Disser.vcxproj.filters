@@ -1,0 +1,118 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="CommonUtilities\attributes_container.cpp">
+      <Filter>CommonUtilities</Filter>
+    </ClCompile>
+    <ClCompile Include="InputOutput\surface_reader.cpp">
+      <Filter>InputOutput</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\molecule_manager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Manager\set_manager.cpp">
+      <Filter>Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="SingularPoints\mesh_constructor.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
+    <ClCompile Include="SingularPoints\mesh_types.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
+    <ClCompile Include="SingularPoints\singular points_finder_test.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
+    <ClCompile Include="SingularPoints\singular_points_finder.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CommonUtilities\attributes_container.h">
+      <Filter>CommonUtilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonUtilities\classic_k_means.h">
+      <Filter>CommonUtilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonUtilities\common_functions.h">
+      <Filter>CommonUtilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonUtilities\is_specialization_of.h">
+      <Filter>CommonUtilities</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonUtilities\priority_heap.h">
+      <Filter>CommonUtilities</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\connected_components_segmentator.h">
+      <Filter>GraphLib\Segmentation</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\graph_operations.h">
+      <Filter>GraphLib\Segmentation</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\k_means_segmentator.h">
+      <Filter>GraphLib\Segmentation</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\segmentation_types.h">
+      <Filter>GraphLib\Segmentation</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\curvature_calculator.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\graph_structures.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="InputOutput\params_reader.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="InputOutput\surface_reader.h">
+      <Filter>InputOutput</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\extensions.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\molecule_manager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\set_manager.h">
+      <Filter>Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\i_singular_points_finder.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\mesh_constructor.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\mesh_types.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\points_marker.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\singular_point_types.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\singular_points_finder.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="SingularPoints">
+      <UniqueIdentifier>{a3aadf0a-7e27-494e-ae80-3c2504d36fe8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GraphLib">
+      <UniqueIdentifier>{5405a9b6-e52f-4789-9342-853db5831cb9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GraphLib\Segmentation">
+      <UniqueIdentifier>{fe8da5c5-8bb9-4b28-a7c5-6b48500fa12c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonUtilities">
+      <UniqueIdentifier>{6d911776-e190-4117-928e-56af9370428b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Manager">
+      <UniqueIdentifier>{9e8a2bae-4b3d-48e2-9e12-1e77a27e9012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="InputOutput">
+      <UniqueIdentifier>{5b1ef666-ee33-45d4-8ecd-af7148a0fa6e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
