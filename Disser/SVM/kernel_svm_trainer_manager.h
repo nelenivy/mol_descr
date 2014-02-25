@@ -2,6 +2,7 @@
 #include <utility>
 #include <vector>
 #include <fstream>
+#include <array>
 #include "boost/archive/polymorphic_text_oarchive.hpp"
 
 #include "opencv2/core/core.hpp"
@@ -51,6 +52,15 @@ namespace boost
 			ar & point.Charge();
 			ar & point.ElectricPotential();
 		}
+
+		template <class Archive, typename T, size_t kSize>
+		void serialize(Archive& ar, /*const*/ /*_<T>*/std::array<T, kSize>& point, const unsigned int version)
+		{
+			for (size_t ind = 0; ind < point.size(); ++ind)
+			{
+				ar & point[ind];
+			}
+		}
 	}
 }
 
@@ -60,7 +70,8 @@ namespace molecule_descriptor
 using std::vector;
 using std::string;
 using  shark::RealVector;
-
+//SingularPoint<> is a pair of 3d point and its PropType
+//PropType is used for kernel PropKernel
 template <typename PropType, class DistKernel, class PropKernel>
 class KernelSVMTrainerManager
 {
@@ -77,8 +88,8 @@ public:
 	void SetData(const vector<vector<singular_point>>& data,
 		const vector<unsigned int>& labels);//Convert input to shark format
 	void SetKernels(DistKernel dist_kernel, PropKernel prop_kernel);
-	void Train(const std::string file_name);
-	void Write(const std::string file_name);
+	void Train(const std::string& file_name);
+	void Write(const std::string& file_name);
 private:
 	void EvaluateTrained();
 
@@ -100,7 +111,7 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::SetData(const ve
 	++m_curr_dataset_id;
 	m_labeled_data = PrepareDataForSVM(data_wth_ind.begin(), data_wth_ind.end(), labels.begin(), labels.end());
 	auto s = m_labeled_data.inputs().elements();
-	for (auto it = s.begin(); it != s.end(); ++it)
+	/*for (auto it = s.begin(); it != s.end(); ++it)
 	{
 		auto d = it->ElemConst();
 		for (auto it1 = d.begin(); it1 != d.end(); ++it1)
@@ -110,7 +121,7 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::SetData(const ve
 		std::cout << "\n";
 
 
-	}
+	}*/
 }
 
 template <typename PropType, class DistKernel, class PropKernel>
@@ -121,7 +132,7 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::SetKernels(DistK
 }
 
 template <typename PropType, class DistKernel, class PropKernel>
-void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::Train(const std::string file_name)
+void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::Train(const std::string& file_name)
 {
 	//trainer
 	const double C = 0.001;
@@ -163,7 +174,7 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::EvaluateTrained(
 }
 
 template <typename PropType, class DistKernel, class PropKernel>
-void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::Write(const std::string file_name)
+void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::Write(const std::string& file_name)
 {
 	std::ofstream out(file_name + "_res_001_01_triangle_triangle.txt");
 	boost::archive::polymorphic_text_oarchive oa(out);

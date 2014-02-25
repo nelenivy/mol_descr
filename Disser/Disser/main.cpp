@@ -9,5 +9,6 @@ int main(int argc, char** argv)
 	//manager.ProcessTriples(true);
 	//manager.ProcessMGUASVM();
 	//manager.ProcessDescriptorsSVM();
-	manager.ProcessKernelSVM();
+	//manager.ProcessKernelSVMPoints();
+	manager.ProcessKernelSVMHistograms();
 }

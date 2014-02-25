@@ -11,7 +11,7 @@ void CreateSubgraph(const std::vector<GraphNode<NodeType>>& graph, std::vector<G
 template <typename NodeType>
 void SplitSegment(const std::vector<GraphNode<NodeType>>& graph, const size_t segment_to_split, const size_t parts_num, size_t& segments_num);
 template <typename NodeType>
-void CalculateSegmentCenters(const std::vector<GraphNode<NodeType>>& graph, std::vector<NodeType>& centers);
+void CalculateSegmentGraphAndCenters(const std::vector<GraphNode<NodeType>>& graph, std::vector<NodeType>& centers);
 
 template <typename NodeType>
 void CreateSubgraph(const std::vector<GraphNode<NodeType>>& graph, std::vector<GraphNode<NodeType>>& subgraph)
@@ -135,7 +135,8 @@ void SplitSegment(const std::vector<GraphNode<NodeType>>& graph, const size_t se
 }
 
 template <typename NodeType>
-void CalculateSegmentCenters(const std::vector<GraphNode<NodeType>>& graph, std::vector<NodeType>& centers)
+void CalculateSegmentGraphAndCenters(const std::vector<GraphNode<NodeType>>& graph, std::vector<NodeType>& centers, 
+	std::vector<GraphNode<NodeType>>& centers_graph)
 {
 	//find clusters number
 	size_t clust_num = 0;
@@ -195,16 +196,51 @@ void CalculateSegmentCenters(const std::vector<GraphNode<NodeType>>& graph, std:
 
 	//write found nodes to the output vector
 	centers.resize(clust_num);
+	std::vector<size_t> centers_nums(clust_num + 1);
+	centers_graph.resize(clust_num);
 	size_t non_zero_cluster = 0;
 	for (size_t curr_clust = 1; curr_clust <= clust_num; ++curr_clust)
 	{
 		if (curr_clust_sizes[curr_clust])
 		{
-			centers[non_zero_cluster++] = *(min_dist_to_center[curr_clust].second);
+			centers[non_zero_cluster] = *(min_dist_to_center[curr_clust].second);
+			centers_nums[curr_clust] = non_zero_cluster;
+			centers_graph[non_zero_cluster].element = &centers[non_zero_cluster];
+			centers_graph[non_zero_cluster].neighbours.clear();
+			++non_zero_cluster;
 		}
 	}
 
 	centers.resize(non_zero_cluster);
+	centers_graph.resize(non_zero_cluster);
+	//calculate segments graph
+	for (auto node_iter = graph.begin(); node_iter != graph.end(); ++node_iter)
+	{
+		const size_t curr_clust_num = node_iter->attr.Get<SegmentNumProp>();
+
+		if (curr_clust_num == 0)
+		{
+			continue;
+		}
+
+		for (auto neighb_iter = node_iter->neighbours.begin(); neighb_iter != node_iter->neighbours.end(); ++neighb_iter)
+		{
+			const size_t neighb_clust_num = (*neighb_iter)->attr.Get<SegmentNumProp>();
+			if (neighb_clust_num == 0)
+			{
+				continue;
+			}
+			if (neighb_clust_num != curr_clust_num)
+			{
+				std::vector<GraphNode<NodeType>*>& curr_center_neighbours = centers_graph[centers_nums[curr_clust_num]].neighbours;
+				GraphNode<NodeType>* neighb_segm_center = &centers_graph[centers_nums[neighb_clust_num]];
+				if (curr_center_neighbours.end() == std::find(curr_center_neighbours.begin(), curr_center_neighbours.end(), neighb_segm_center))
+				{
+					curr_center_neighbours.push_back(neighb_segm_center);
+				}
+			}
+		}
+	}
 }
 
 }

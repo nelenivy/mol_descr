@@ -17,7 +17,8 @@ namespace molecule_descriptor
 {
 
 using  shark::RealVector;
-
+//SingularPoint<> is a pair of 3d point and its PropType
+//PropType is used for kernel PropKernel
 template<typename PropType, class DistKernel, class PropKernel>//PropKernel must have default constructor
 class PharmSequenceKernel : public shark::AbstractKernelFunction<
 	ElemWithIndexAndID<//it's to not calculate gramm matrix each time

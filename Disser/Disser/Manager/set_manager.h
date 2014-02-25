@@ -18,7 +18,8 @@ public:
 	void ProcessSingularPoints(const bool calculate);
 	void ProcessPairs(const bool calculate);
 	void ProcessTriples(const bool calculate);
-	void ProcessKernelSVM();
+	void ProcessKernelSVMPoints();
+	void ProcessKernelSVMHistograms();
 	void ProcessDescriptorsSVM();
 	void ProcessMGUASVM();
 private:

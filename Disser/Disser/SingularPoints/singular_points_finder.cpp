@@ -31,9 +31,10 @@ void SingularPointsFinder::Process(const std::vector<cv::Point3d>& vertices, con
 	CalculateVerticesSurfaceType();
 	const int kMaxSegmSize = 500;
 	SegmentMolecularSurface(kMaxSegmSize);
-	FindSegmentsCenters();
+	FindSegmentsGraphAndCenters();
 	CalculatePotential(m_singular_points, charges);
 	CalculateSingularPointsTypes();
+	CalculateSingularPointsHistograms();
 }
 
 size_t SingularPointsFinder::GetTypesNum()
@@ -67,6 +68,18 @@ void SingularPointsFinder::GetNonMarkedSingularPoints(std::vector<NonMarkedSingu
 	}
 }
 
+void SingularPointsFinder::GetSingularPointsHisto(std::vector<HistogramSingularPoint<kHistSize>>& singular_points_hist)
+{
+	singular_points_hist.resize(m_sing_pts_histo.size());
+
+	for (size_t ind = 0; ind < m_sing_pts_histo.size(); ++ind)
+	{
+		auto& curr_point = singular_points_hist[ind];
+		curr_point.Property() = m_sing_pts_histo[ind];
+		curr_point.Coord() = m_singular_points[ind].Center();
+	}
+}
+
 void SingularPointsFinder::GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers)
 {
 	const std::vector<MeshVertice>& vertices = *(m_mesh_keeper.GetMeshVertices());
@@ -96,6 +109,8 @@ void SingularPointsFinder::GetVerticesWithTypes(std::vector<std::pair<cv::Point3
 void SingularPointsFinder::Clear()
 {
 	m_singular_points.clear();
+	m_singular_points_graph.clear();
+	m_sing_pts_histo.clear();
 }
 
 void SingularPointsFinder::CalculateVerticesSurfaceType()
@@ -244,10 +259,10 @@ void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
 	SplitSegment(vertices, segm_num_to_split, parts_num, all_segm_num);
 }
 
-void SingularPointsFinder::FindSegmentsCenters()
+void SingularPointsFinder::FindSegmentsGraphAndCenters()
 {
 	const std::vector<GraphNode<Vertice>>& vertices_graph = *(m_mesh_keeper.GetMeshVertices());
-	CalculateSegmentCenters(vertices_graph, m_singular_points);
+	CalculateSegmentGraphAndCenters(vertices_graph, m_singular_points, m_singular_points_graph);
 }
 
 void SingularPointsFinder::CalculateSingularPointsTypes()
@@ -257,6 +272,26 @@ void SingularPointsFinder::CalculateSingularPointsTypes()
 		const size_t curr_type = CalculateSingularPointType<SurfaceTypeProp, ElectricSign>(iter->attr);
 		iter->attr.Add<SingularPointType>();
 		iter->attr.Get<SingularPointType>() = curr_type;
+	}
+}
+
+void SingularPointsFinder::CalculateSingularPointsHistograms()
+{
+	m_sing_pts_histo.resize(m_singular_points_graph.size());
+	CV_Assert(kHistSize == GetTypesNum());
+
+	for (auto node_iter = m_singular_points_graph.begin(); node_iter != m_singular_points_graph.end(); ++node_iter)
+	{
+		std::array<uint8_t, kHistSize>& curr_hist = m_sing_pts_histo[node_iter - m_singular_points_graph.begin()];
+		std::fill(curr_hist.begin(), curr_hist.end(), 0);
+		const size_t curr_type = node_iter->element->attr.Get<SingularPointType>();
+		++curr_hist[curr_type];
+
+		for (auto neighb_iter = node_iter->neighbours.begin(); neighb_iter != node_iter->neighbours.end(); ++neighb_iter)
+		{
+			const size_t neighb_type = (*neighb_iter)->element->attr.Get<SingularPointType>();
+			++curr_hist[neighb_type];
+		}
 	}
 }
 

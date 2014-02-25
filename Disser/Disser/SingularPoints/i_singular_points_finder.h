@@ -23,6 +23,9 @@ public:
 	virtual void GetNonMarkedSingularPoints(std::vector<NonMarkedSingularPoint>& non_marked_singular_points) = 0;
 	virtual void GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers) = 0;
 	virtual void GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types) = 0;
+	static const size_t kHistSize = 9;
+	virtual void GetSingularPointsHisto(std::vector<HistogramSingularPoint<kHistSize>>& singular_points_hist) = 0;
+
 	virtual void Release() = 0;
 };
 

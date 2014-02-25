@@ -107,7 +107,7 @@ void SetManager::ProcessTriples(const bool calculate)
 	WriteMatrix(m_md_matrix, m_mol_folder + m_mol_prefix + Extensions::TriplesMDMatrix());
 }
 
-void SetManager::ProcessKernelSVM()
+void SetManager::ProcessKernelSVMPoints()
 {
 	std::vector<std::vector<NonMarkedSingularPoint>> pts(m_molecules_num);
 
@@ -139,6 +139,43 @@ void SetManager::ProcessKernelSVM()
 	svm_trainer.Write(m_mol_folder + m_mol_prefix);
 }
 
+void SetManager::ProcessKernelSVMHistograms()
+{
+	std::vector<std::vector<HistogramSingularPoint<9>>> pts(m_molecules_num);
+
+	for (int ind = 0; ind < m_molecules_num; ind++)
+	{
+		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
+		m_molecule_manager.FindSingularPoints(true);
+		m_molecule_manager.GetHistogramSingularPoints(pts[ind]);
+	}
+
+	std::vector<int> labels;
+	ReadVector(m_mol_folder + m_mol_prefix + Extensions::Labels(), labels);
+
+	for (auto it = labels.begin(); it != labels.end(); ++it)
+	{
+		*it = *it == -1 ? 0 : *it;
+	}
+
+	std::vector<unsigned int> unsigned_labels(labels.begin(), labels.end());
+	typedef std::array<uint8_t, 9> prop_type;
+	KernelSVMTrainerManager<prop_type, GaussianKernelOneDim, ScalarProductKernel<prop_type>> svm_trainer;
+	std::vector<std::vector<SingularPoint<prop_type>>> pts_in(m_molecules_num);
+	for (int ind = 0; ind < pts.size(); ++ind)
+	{
+		pts_in[ind].resize(pts[ind].size());
+		for (int ind1 = 0; ind1 < pts[ind].size(); ++ind1)
+		{
+			pts_in[ind][ind1] = pts[ind][ind1];
+		}
+	}
+	svm_trainer.SetData(pts_in, unsigned_labels);
+	svm_trainer.SetKernels(GaussianKernelOneDim(0.1), ScalarProductKernel<prop_type>());
+	svm_trainer.Train(m_mol_folder + m_mol_prefix);
+	svm_trainer.Write(m_mol_folder + m_mol_prefix+ "_histo");
+}
+
 void SetManager::ProcessDescriptorsSVM()
 {
 	//read MD matrix
@@ -151,6 +188,7 @@ void SetManager::ProcessDescriptorsSVM()
 	{
 		*it = *it == -1 ? 0 : *it;
 	}
+
 
 	std::vector<unsigned int> unsigned_labels(labels.begin(), labels.end());
 	DescriptorSVMTrainerManager svm_trainer;

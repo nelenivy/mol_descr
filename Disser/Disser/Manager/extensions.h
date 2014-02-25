@@ -7,6 +7,7 @@ struct Extensions
 	static const char* Surface() { return ".wrl";}
 	static const char* SingPts() { return ".sng";}
 	static const char* NonMarkedSingPts() {return ".sngnm";}
+	static const char* HistSingPts() {return ".hist";}
 	static const char* MeshTriangles() { return ".tr";}
 	static const char* Charges() { return ".ch";}
 	static const char* SegmSurf() { return ".sgm";}

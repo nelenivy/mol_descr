@@ -26,6 +26,8 @@ using std::pair;
 using std::tuple;
 using std::array;
 
+//SingularPoint<> is a pair of 3d point and its Property
+//for Property is used kernel PropsKernel in method ProcessPairs
 template<typename PropType>
 class PharmacophoreKernelBase
 {
@@ -39,19 +41,19 @@ public:
 	double ProcessPairs(DistanceKernel distance_kernel, PropsKernel props_kernel);
 	double ProcessTriples();
 	double GetPairsKernelVal() { 
-		return m_curr_pairs_kernel; }
+		return m_curr_pairs_kernel_val; }
 	double GetTriplesKernelVal() { 
-		return m_curr_triples_kernel; }
+		return m_curr_triples_kernel_val; }
 private:
 	/*double CalcKernelAll();
 	double CalcKernelMax();*/
 	singular_points_cont m_pts_1;
 	singular_points_cont m_pts_2;
-	vector<tuple<int, int, float>> m_precalc_vector_for_triples;
+	vector<tuple<int, int, float>> m_precalc_vector_for_triples;//index1, index2, kernel val
 	vector<float> m_kernels_for_pairs;
 	vector<float> m_precalc_matrix_for_triples;
-	double m_curr_pairs_kernel;
-	double m_curr_triples_kernel;
+	double m_curr_pairs_kernel_val;
+	double m_curr_triples_kernel_val;
 };
 
 
@@ -108,7 +110,7 @@ double PharmacophoreKernelBase<PropType>::ProcessPairs(DistanceKernel distance_k
 	kernels.resize(pair_num);
 	m_precalc_matrix_for_triples.resize(pair_num * pair_num);
 	//std::fill(m_kernels_for_pairs.begin(), m_kernels_for_pairs.end(), 0);
-	m_curr_pairs_kernel = 0;
+	m_curr_pairs_kernel_val = 0;
 	const int pairs_1_num = m_pts_1.size() * m_pts_1.size();
 	const int pairs_2_num = m_pts_2.size() * m_pts_2.size();
 
@@ -181,8 +183,8 @@ double PharmacophoreKernelBase<PropType>::ProcessPairs(DistanceKernel distance_k
 		return CalcKernelAll();
 	}*/
 
-	m_curr_pairs_kernel = std::accumulate(res, res + kMaxThreads, 0.0);
-	return m_curr_pairs_kernel;
+	m_curr_pairs_kernel_val = std::accumulate(res, res + kMaxThreads, 0.0);
+	return m_curr_pairs_kernel_val;
 }
 
 template<typename PropType>
@@ -221,8 +223,8 @@ double PharmacophoreKernelBase<PropType>::ProcessTriples()
 		}
 	}
 
-	m_curr_triples_kernel = std::accumulate(res, res + kMaxThreads, 0.0);
-	return m_curr_triples_kernel;
+	m_curr_triples_kernel_val = std::accumulate(res, res + kMaxThreads, 0.0);
+	return m_curr_triples_kernel_val;
 }
 
 

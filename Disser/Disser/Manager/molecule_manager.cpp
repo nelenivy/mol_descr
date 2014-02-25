@@ -276,6 +276,7 @@ void MoleculeManager::CalculateSingularPoints()
 	m_sing_pts_finder->Process(vertices, normals, triangles, charges);
 	m_sing_pts_finder->GetMarkedSingularPoints(m_singular_points);
 	m_sing_pts_finder->GetNonMarkedSingularPoints(m_non_marked_singular_points);
+	m_sing_pts_finder->GetSingularPointsHisto(m_histogram_singular_points);
 }
 
 void MoleculeManager::ReadSingularPoints()
@@ -285,6 +286,9 @@ void MoleculeManager::ReadSingularPoints()
 
 	const std::string non_marked_points_file_name = m_curr_file_prefix + Extensions::NonMarkedSingPts();
 	ReadVector(non_marked_points_file_name, m_non_marked_singular_points);
+
+	const std::string hist_points_file_name = m_curr_file_prefix + Extensions::HistSingPts();
+	ReadVector(hist_points_file_name, m_histogram_singular_points);
 }
 
 void MoleculeManager::WriteSingularPoints()
@@ -294,6 +298,9 @@ void MoleculeManager::WriteSingularPoints()
 
 	const std::string non_marked_points_file_name = m_curr_file_prefix + Extensions::NonMarkedSingPts();
 	WriteInterval(non_marked_points_file_name, m_non_marked_singular_points.begin(), m_non_marked_singular_points.end());
+
+	const std::string hist_points_file_name = m_curr_file_prefix + Extensions::HistSingPts();
+	WriteInterval(hist_points_file_name, m_histogram_singular_points.begin(), m_histogram_singular_points.end());
 }
 
 void MoleculeManager::WriteSegmentedSurface()

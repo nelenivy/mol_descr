@@ -34,6 +34,11 @@ public:
 	{
 		sing_points = m_non_marked_singular_points;
 	}
+	template <size_t kArrSize>
+	void GetHistogramSingularPoints(std::vector<HistogramSingularPoint<kArrSize>>& sing_points) 
+	{
+		sing_points = m_histogram_singular_points;
+	}
 
 	void AppendDistances(std::vector<double>& distances);
 	void CalculatePairsWithTypes();
@@ -63,6 +68,7 @@ private:
 	void WriteSurfaceWithTypes();
 private:
 	std::shared_ptr<ISingularPointsFinder> m_sing_pts_finder;
+	static const size_t kHistSize = 9;
 	typedef MarkedSingularPoint point_with_type;
 	//typedef std::pair<cv::Point3d, size_t> point_with_type;
 	typedef std::tuple<point_with_type, point_with_type, double> pair_with_distance;
@@ -75,6 +81,7 @@ private:
 
 	std::vector<point_with_type> m_singular_points;
 	std::vector<NonMarkedSingularPoint> m_non_marked_singular_points;
+	std::vector<HistogramSingularPoint<kHistSize>> m_histogram_singular_points;
 	std::vector<pair_with_distance> m_pairs;
 	std::vector<pair_with_distance_type> m_pairs_with_types;
 	std::vector<size_t> m_pairs_histogram;

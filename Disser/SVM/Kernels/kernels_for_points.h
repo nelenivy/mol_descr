@@ -6,6 +6,36 @@
 
 namespace molecule_descriptor
 {
+
+template<typename ContainerType>
+struct ScalarProductKernel : public shark::IParameterizable
+{
+	inline double operator()(const ContainerType& x, const ContainerType& y)
+	{
+		double res = 0.0;
+		SHARK_ASSERT(x.size() == y.size());
+		for (size_t ind = 0; ind < x.size(); ++ind)
+		{
+			res += x[ind] * y[ind];
+		}
+		return res;
+	}
+
+	virtual shark::RealVector parameterVector() const
+	{
+		return m_params_vect;
+	}	 
+	/// set the vector of hyper-parameters
+	virtual void setParameterVector(RealVector const& new_parameters)
+	{
+	}	 
+	/// return the number of hyper-parameters
+	virtual size_t numberOfParameters() const{ 
+		return m_params_vect.size();
+	}
+private:
+	shark::RealVector m_params_vect;
+};
 template<typename Kernel_1, typename Kernel_2>
 struct KernelForPair : public shark::IParameterizable
 {

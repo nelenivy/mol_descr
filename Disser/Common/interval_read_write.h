@@ -2,6 +2,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <array>
 #include <iterator>
 #include <string>
 #include <fstream>
@@ -155,6 +156,17 @@ struct ReadElemNonChecked<std::tuple<T1, T2, T3>>
 		ReadElemNonChecked<T3>::Do(file_in, std::get<2>(new_elem));
 	}
 };
+template <typename T, size_t kArrSize>
+struct ReadElemNonChecked<std::array<T, kArrSize>>
+{
+	static inline void Do(std::ifstream& file_in, std::array<T, kArrSize>& new_elem)
+	{
+		for (size_t ind = 0; ind < kArrSize; ++ind)
+		{
+			ReadElemNonChecked<T>::Do(file_in, new_elem[ind]);
+		}
+	}
+};
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
 inline bool ReadElem(std::ifstream& file_in, T& new_elem, std::string& string_buf)
@@ -246,6 +258,18 @@ struct WriteElemToFile<std::tuple<T1, T2, T3>>
 		WriteElemToFile<T2>()(file_out, std::get<1>(elem));
 		WriteElemToFile<T3>()(file_out, std::get<2>(elem));
 		/*WriteTupleIndexToFile<3>(file_out, elem);*/
+	}
+};
+
+template <typename T, size_t kArrSize>
+struct WriteElemToFile<std::array<T, kArrSize>>
+{
+	inline void operator()(std::ofstream& file_out, const std::array<T, kArrSize>& elem)
+	{
+		for (size_t ind = 0; ind < kArrSize; ++ind)
+		{
+			WriteElemToFile<T>()(file_out, elem[ind]);
+		}
 	}
 };
 

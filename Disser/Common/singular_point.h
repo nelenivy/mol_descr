@@ -2,6 +2,8 @@
 
 #include <utility>
 #include <tuple>
+#include <array>
+#include <stdint.h>
 #include "opencv2/core/core.hpp"
 
 #include "interval_read_write.h"
@@ -88,7 +90,7 @@ public:
 	{
 		return m_properties;
 	}
-private:
+private: 
 	std::tuple<size_t, int, float> m_properties;
 };
 
@@ -136,8 +138,32 @@ struct ReadElemNonChecked<PropertiesSet>
 		ReadElemNonChecked<std::tuple<size_t, int, float>>::Do(file_in, new_elem.GetAsTuple());
 	}
 };
+//singular point with histogram
+template <int kHistSize>
+class HistogramSingularPoint : public SingularPoint<std::array<uint8_t, kHistSize>>
+{
+
+};
+
+//specialization of output
+template <int kHistSize>
+struct WriteElemToFile<HistogramSingularPoint<kHistSize>>
+{
+	inline void operator()(std::ofstream& file_out, const HistogramSingularPoint<kHistSize>& elem)
+	{
+		WriteElemToFile<SingularPoint<std::array<uint8_t, kHistSize>>>()(file_out, elem);
+	}
+};
+//specialization of input
+template <int kHistSize>
+struct ReadElemNonChecked<HistogramSingularPoint<kHistSize>>
+{
+	static inline void Do(std::ifstream& file_in, HistogramSingularPoint<kHistSize>& new_elem)
+	{
+		ReadElemNonChecked<SingularPoint<std::array<uint8_t, kHistSize>>>::Do(file_in, new_elem);
+	}
+};
 typedef SingularPoint<size_t> MarkedSingularPoint;
 typedef SingularPoint<PropertiesSet> NonMarkedSingularPoint;
-
 
 }
