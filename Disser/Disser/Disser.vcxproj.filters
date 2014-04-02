@@ -2,9 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="CommonUtilities\attributes_container.cpp">
-      <Filter>CommonUtilities</Filter>
-    </ClCompile>
     <ClCompile Include="InputOutput\surface_reader.cpp">
       <Filter>InputOutput</Filter>
     </ClCompile>
@@ -17,9 +14,6 @@
     <ClCompile Include="SingularPoints\mesh_constructor.cpp">
       <Filter>SingularPoints</Filter>
     </ClCompile>
-    <ClCompile Include="SingularPoints\mesh_types.cpp">
-      <Filter>SingularPoints</Filter>
-    </ClCompile>
     <ClCompile Include="SingularPoints\singular points_finder_test.cpp">
       <Filter>SingularPoints</Filter>
     </ClCompile>
@@ -28,16 +22,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CommonUtilities\attributes_container.h">
-      <Filter>CommonUtilities</Filter>
-    </ClInclude>
     <ClInclude Include="CommonUtilities\classic_k_means.h">
       <Filter>CommonUtilities</Filter>
     </ClInclude>
     <ClInclude Include="CommonUtilities\common_functions.h">
-      <Filter>CommonUtilities</Filter>
-    </ClInclude>
-    <ClInclude Include="CommonUtilities\is_specialization_of.h">
       <Filter>CommonUtilities</Filter>
     </ClInclude>
     <ClInclude Include="CommonUtilities\priority_heap.h">
@@ -52,13 +40,7 @@
     <ClInclude Include="GraphLib\k_means_segmentator.h">
       <Filter>GraphLib\Segmentation</Filter>
     </ClInclude>
-    <ClInclude Include="GraphLib\segmentation_types.h">
-      <Filter>GraphLib\Segmentation</Filter>
-    </ClInclude>
     <ClInclude Include="GraphLib\curvature_calculator.h">
-      <Filter>GraphLib</Filter>
-    </ClInclude>
-    <ClInclude Include="GraphLib\graph_structures.h">
       <Filter>GraphLib</Filter>
     </ClInclude>
     <ClInclude Include="InputOutput\params_reader.h">
@@ -85,14 +67,17 @@
     <ClInclude Include="SingularPoints\mesh_types.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
-    <ClInclude Include="SingularPoints\points_marker.h">
-      <Filter>SingularPoints</Filter>
-    </ClInclude>
     <ClInclude Include="SingularPoints\singular_point_types.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
     <ClInclude Include="SingularPoints\singular_points_finder.h">
       <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\array_property_map.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\dijkstra_dist_matr.h">
+      <Filter>GraphLib</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

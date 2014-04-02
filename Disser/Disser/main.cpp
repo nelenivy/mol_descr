@@ -4,7 +4,7 @@ int main(int argc, char** argv)
 {
 	molecule_descriptor::SetManager manager;
 	manager.Init(argc, argv);
-	manager.ProcessSingularPoints(false);
+	manager.ProcessSingularPoints(true);
 	//manager.ProcessPairs(false);
 	//manager.ProcessTriples(true);
 	//manager.ProcessMGUASVM();

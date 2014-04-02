@@ -154,28 +154,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CommonUtilities\attributes_container.cpp" />
     <ClCompile Include="InputOutput\surface_reader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Manager\molecule_manager.cpp" />
     <ClCompile Include="Manager\set_manager.cpp" />
     <ClCompile Include="SingularPoints\mesh_constructor.cpp" />
-    <ClCompile Include="SingularPoints\mesh_types.cpp" />
     <ClCompile Include="SingularPoints\singular points_finder_test.cpp" />
     <ClCompile Include="SingularPoints\singular_points_finder.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CommonUtilities\attributes_container.h" />
     <ClInclude Include="CommonUtilities\classic_k_means.h" />
     <ClInclude Include="CommonUtilities\common_functions.h" />
-    <ClInclude Include="CommonUtilities\is_specialization_of.h" />
     <ClInclude Include="CommonUtilities\priority_heap.h" />
+    <ClInclude Include="GraphLib\array_property_map.h" />
     <ClInclude Include="GraphLib\connected_components_segmentator.h" />
     <ClInclude Include="GraphLib\curvature_calculator.h" />
+    <ClInclude Include="GraphLib\dijkstra_dist_matr.h" />
     <ClInclude Include="GraphLib\graph_operations.h" />
-    <ClInclude Include="GraphLib\graph_structures.h" />
     <ClInclude Include="GraphLib\k_means_segmentator.h" />
-    <ClInclude Include="GraphLib\segmentation_types.h" />
     <ClInclude Include="InputOutput\params_reader.h" />
     <ClInclude Include="InputOutput\surface_reader.h" />
     <ClInclude Include="Manager\extensions.h" />
@@ -184,7 +180,6 @@
     <ClInclude Include="SingularPoints\i_singular_points_finder.h" />
     <ClInclude Include="SingularPoints\mesh_constructor.h" />
     <ClInclude Include="SingularPoints\mesh_types.h" />
-    <ClInclude Include="SingularPoints\points_marker.h" />
     <ClInclude Include="SingularPoints\singular_points_finder.h" />
     <ClInclude Include="SingularPoints\singular_point_types.h" />
   </ItemGroup>
