@@ -4,11 +4,13 @@ int main(int argc, char** argv)
 {
 	molecule_descriptor::SetManager manager;
 	manager.Init(argc, argv);
-	manager.ProcessSingularPoints(true);
-	//manager.ProcessPairs(false);
+	manager.ProcessSingularPoints(false);
+	manager.ProcessPairs(true);
+	//manager.ProcessKernelSVMPointsWithFiltering();
 	//manager.ProcessTriples(true);
-	//manager.ProcessMGUASVM();
+	//manager.ProcessMGUASVMRegression();
+	manager.ProcessMGUASVMClassification(20, 10);
 	//manager.ProcessDescriptorsSVM();
 	//manager.ProcessKernelSVMPoints();
-	manager.ProcessKernelSVMHistograms();
+	//manager.ProcessKernelSVMHistograms();
 }

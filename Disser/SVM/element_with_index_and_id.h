@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 #include <tuple>
 #include <vector>
 #include <algorithm>
@@ -10,43 +11,43 @@ namespace molecule_descriptor
 {
 
 template <class ElemType, typename DataIDType = int>
-class ElemWithIndexAndID
+class ElemWithIndexAndID : public ElemType
 {
 public:
 	ElemWithIndexAndID() {
 
 	}
 	ElemWithIndexAndID(const ElemType& elem, const int ind, const DataIDType data_id, const size_t set_size)
-		: m_elem_with_ind(elem, ind, data_id, set_size)
+		: ElemType(elem), m_elem_with_ind(ind, data_id, set_size)
 	{
 
 	}
 	ElemType& Elem()
 	{
-		return std::get<0>(m_elem_with_ind);
+		return *this;
 	}
 
 	const ElemType& ElemConst() const
 	{
-		return std::get<0>(m_elem_with_ind);
+		return *this;
 	}
 
 	int Index() const
 	{
-		return std::get<1>(m_elem_with_ind);
+		return std::get<0>(m_elem_with_ind);
 	}
 
 	DataIDType DataID() const//id of the set which element belongs to
 	{
-		return std::get<2>(m_elem_with_ind);
+		return std::get<1>(m_elem_with_ind);
 	}
 
 	size_t SizeOfSet() const//id of the set which element belongs to
 	{
-		return std::get<3>(m_elem_with_ind);
+		return std::get<2>(m_elem_with_ind);
 	}
 private:
-	std::tuple<ElemType, size_t, DataIDType, size_t> m_elem_with_ind;
+	std::tuple<size_t, DataIDType, size_t> m_elem_with_ind;
 };
 
 template <typename InIterType, typename ElemType>
@@ -65,5 +66,27 @@ void CreateSeqWithIndexAndIdFromSeq(InIterType in_begin, InIterType in_end, int 
 	{
 		output.push_back(ElemWithIndexAndID<ElemType>(*in_begin, ind, dataset_id, set_size));
 	}
+}
+
+template <typename ElemT, typename LabelT, typename DataIdT>
+shark::LabeledData<ElemT, LabelT> CopyFromIndexedToNonIndexed(
+	shark::LabeledData<ElemWithIndexAndID<ElemT, DataIdT>, LabelT>& labeled_data)
+{
+	typedef ElemWithIndexAndID<ElemT, DataIdT> ElemWithInd;
+
+	shark::UnlabeledData<ElemT> unlabeled_data(labeled_data.numberOfBatches());
+	for (size_t batch_ind = 0; batch_ind < labeled_data.numberOfBatches(); ++batch_ind)
+	{
+		auto& curr_batch_in = labeled_data.inputs().batch(batch_ind);
+		auto& curr_batch_out = unlabeled_data.inputs().batch(batch_ind);
+		curr_batch_out = shark::Batch<ElemT>::createBatch(shark::get(curr_batch_in, 0).Elem(), curr_batch_in.size());
+		//shark::Batch<ElemT>::resize(curr_batch_out, curr_batch_in.size(), 0);
+
+		for (size_t elem_ind = 0; elem_ind < curr_batch_in.size(); ++elem_ind)
+			shark::get(curr_batch_out, elem_ind)=shark::get(curr_batch_in, elem_ind).Elem();
+			//curr_batch_out.push_back(curr_batch_in.inputs().element(ind).Elem());
+	}
+
+	return shark::LabeledData<ElemT, LabelT>(unlabeled_data, labeled_data.labels());
 }
 }

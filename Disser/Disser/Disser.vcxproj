@@ -144,6 +144,7 @@
       <AdditionalIncludeDirectories>E:\thirdparty\boost_1_53_0;E:\thirdparty\OpenCV-2.4\include;$(ProjectDir);E:\thirdparty\Shark\include\;</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <OpenMPSupport>true</OpenMPSupport>
+      <PreprocessorDefinitions>_VARIADIC_MAX 10;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -170,18 +171,22 @@
     <ClInclude Include="GraphLib\connected_components_segmentator.h" />
     <ClInclude Include="GraphLib\curvature_calculator.h" />
     <ClInclude Include="GraphLib\dijkstra_dist_matr.h" />
+    <ClInclude Include="GraphLib\graph_filter.h" />
+    <ClInclude Include="GraphLib\graph_functions.h" />
     <ClInclude Include="GraphLib\graph_operations.h" />
     <ClInclude Include="GraphLib\k_means_segmentator.h" />
+    <ClInclude Include="GraphLib\proxy_property_map.h" />
     <ClInclude Include="InputOutput\params_reader.h" />
     <ClInclude Include="InputOutput\surface_reader.h" />
     <ClInclude Include="Manager\extensions.h" />
     <ClInclude Include="Manager\molecule_manager.h" />
     <ClInclude Include="Manager\set_manager.h" />
+    <ClInclude Include="Manager\types_calculation.h" />
     <ClInclude Include="SingularPoints\i_singular_points_finder.h" />
     <ClInclude Include="SingularPoints\mesh_constructor.h" />
+    <ClInclude Include="SingularPoints\mesh_operations.h" />
     <ClInclude Include="SingularPoints\mesh_types.h" />
     <ClInclude Include="SingularPoints\singular_points_finder.h" />
-    <ClInclude Include="SingularPoints\singular_point_types.h" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

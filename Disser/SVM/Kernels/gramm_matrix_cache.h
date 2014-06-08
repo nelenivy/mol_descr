@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 //kernel type for not recalculating kernel each time
 #include <tuple>
 #include <vector>

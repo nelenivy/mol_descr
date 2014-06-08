@@ -22,10 +22,10 @@
  *
  */
 
-#ifndef SHARK_OBJECTIVEFUNCTIONS_LOSS_ZEROONELOSS_FUZZY_H
-#define SHARK_OBJECTIVEFUNCTIONS_LOSS_ZEROONELOSS_FUZZY_H
-#include "stdafx.h"
+#ifndef SHARK_OBJECTIVEFUNCTIONS_LOSS_ZEROONELOSS_NON_AVERAGE_H
+#define SHARK_OBJECTIVEFUNCTIONS_LOSS_ZEROONELOSS_NON_AVERAGE_H
 
+#include "stdafx.h"
 #include <shark/ObjectiveFunctions/Loss/AbstractLoss.h>
 
 namespace shark {
@@ -39,7 +39,7 @@ namespace shark {
 /// matches the label, and one otherwise.
 ///
 template<class LabelType = unsigned int, class OutputType = LabelType>
-class ZeroOneLossFuzzy : public AbstractLoss<LabelType, LabelType>
+class ZeroOneLossNonAverage : public AbstractLoss<LabelType, LabelType>
 {
 public:
 	typedef AbstractLoss<LabelType, LabelType> base_type;
@@ -47,16 +47,28 @@ public:
 	typedef typename base_type::BatchOutputType BatchOutputType;
 
 	/// constructor
-	ZeroOneLossFuzzy()
+	ZeroOneLossNonAverage()
 	{ }
 
 
 	/// \brief From INameable: return the class name.
 	std::string name() const
-	{ return "ZeroOneLossFuzzy"; }
+	{ return "ZeroOneLossNonAverage"; }
 
 	using base_type::eval;
-
+	virtual double eval(Data<LabelType> const& targets, Data<OutputType> const& predictions) const override{
+		SIZE_CHECK(predictions.numberOfElements() == targets.numberOfElements());
+		SIZE_CHECK(predictions.numberOfBatches() == targets.numberOfBatches());
+		int numBatches = (int) targets.numberOfBatches();
+		double error = 0;
+		SHARK_PARALLEL_FOR(int i = 0; i < numBatches; ++i){
+			double batchError= eval(targets.batch(i),predictions.batch(i));
+			SHARK_CRITICAL_REGION{
+				error+=batchError;
+			}
+		}
+		return error;
+	}
 	///\brief Return zero if labels == predictions and one otherwise.
 	double eval(BatchLabelType const& labels, BatchOutputType const& predictions) const{
 		std::size_t numInputs = size(labels);
@@ -65,7 +77,15 @@ public:
 		double error = 0;
 		for(std::size_t i = 0; i != numInputs; ++i){
 			error += (predictions(i) != labels(i))?1.0:0.0;
+			//if (predictions(i) != labels(i))
+				//std::cout << labels(i) << " ";
 		}
+
+		if (error > 0)
+		{
+			//std::cout << "\n";
+		}
+
 		return error;
 	}
 };
@@ -73,7 +93,7 @@ public:
 
 /// \brief 0-1-loss for classification.
 template <>
-class ZeroOneLossFuzzy<unsigned int, RealVector> : public AbstractLoss<unsigned int, RealVector>
+class ZeroOneLossNonAverage<unsigned int, RealVector> : public AbstractLoss<unsigned int, RealVector>
 {
 public:
 	typedef AbstractLoss<unsigned int, RealVector> base_type;
@@ -83,20 +103,35 @@ public:
 	/// constructor
 	///
     /// \param threshold: in the case dim(predictions) == 1, predictions strictly larger than this parameter are regarded as belonging to the positive class
-	ZeroOneLossFuzzy(double zero_class_thresh, double positive_class_thresh)
-		: m_zero_class_thresh(zero_class_thresh), m_positive_class_thresh(positive_class_thresh)
+	ZeroOneLossNonAverage(double threshold = 0.0)
 	{
-		SHARK_ASSERT(m_zero_class_thresh < m_positive_class_thresh);
+		m_threshold = threshold;
 	}
 
 	/// \brief From INameable: return the class name.
 	std::string name() const
-	{ return "ZeroOneLossFuzzy"; }
+	{ return "ZeroOneLossNonAverage"; }
 
 
 	// annoyingness of C++ templates
 	using base_type::eval;
-
+	/// from AbstractCost
+	///
+	/// \param  targets      target values
+	/// \param  predictions  predictions, typically made by a model
+	virtual double eval(Data<unsigned int> const& targets, Data<RealVector> const& predictions) const{
+		SIZE_CHECK(predictions.numberOfElements() == targets.numberOfElements());
+		SIZE_CHECK(predictions.numberOfBatches() == targets.numberOfBatches());
+		int numBatches = (int) targets.numberOfBatches();
+		double error = 0;
+		SHARK_PARALLEL_FOR(int i = 0; i < numBatches; ++i){
+			double batchError= eval(targets.batch(i),predictions.batch(i));
+			SHARK_CRITICAL_REGION{
+				error+=batchError;
+			}
+		}
+		return error;
+	}
 	/// Return zero if labels == arg max { predictions_i } and one otherwise,
 	/// where the index i runs over the components of the predictions vector.
 	/// A special version of dim(predictions) == 1 computes the predicted
@@ -109,12 +144,14 @@ public:
 
 		double error = 0;
 		for(std::size_t i = 0; i != numInputs; ++i){
-
-			double mult = 1.0;
-			/*if (labels(i) == 1) {
-				mult = 1.0 / 3.0;
-			}*/
-			error+=evalSingle(labels(i),get(predictions,i)) * mult;
+			const double res = evalSingle(labels(i),get(predictions,i));
+			error+= res;
+			//if (res > 0.0)
+				//std::cout << i << " label " << labels(i) << " ";
+		}
+		if (error > 0.0)
+		{
+			//std::cout << "\n";
 		}
 		return error;
 	}
@@ -124,28 +161,24 @@ private:
 		std::size_t size = predictions.size();
 		if (size == 1){
 			// binary case, single real-valued predictions
-			/*unsigned int t = (predictions(0) > m_zero_class_thresh);
+			unsigned int t = (predictions(0) > m_threshold);
 			if (t == label) return 0.0;
-			else return 1.0;*/
-			// binary case, single real-valued predictions
-			return std::abs(std::max(std::min(predictions(0), m_positive_class_thresh), m_zero_class_thresh) / (m_positive_class_thresh - m_zero_class_thresh) - label);
-			//return res ? 1.0 : 0.0;
+			else return 1.0;
 		}
 		else{
-			SHARK_ASSERT(0);
-			//// multi-class case, one prediction component per class
-			//RANGE_CHECK(label < size);
-			//double p = predictions(label);
-			//for (std::size_t i = 0; i<size; i++)
-			//{
-			//	if (i == label) continue;
-			//	if (predictions(i) >= p) return 1.0;
-			//}
-			//return 0.0;
+			// multi-class case, one prediction component per class
+			RANGE_CHECK(label < size);
+			double p = predictions(label);
+			for (std::size_t i = 0; i<size; i++)
+			{
+				if (i == label) continue;
+				if (predictions(i) >= p) return 1.0;
+			}
+			return 0.0;
 		}
 	}
 
-	double m_zero_class_thresh, m_positive_class_thresh; ///< in the case dim(predictions) == 1, predictions strictly larger tha this parameter are regarded as belonging to the positive class
+	double m_threshold; ///< in the case dim(predictions) == 1, predictions strictly larger tha this parameter are regarded as belonging to the positive class
 };
 
 

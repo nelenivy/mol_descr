@@ -26,5 +26,5 @@ for (my $ind = 0; $ind < $array_of_molecules->Count(); $ind++)
 {
 	my $molecule = $array_of_molecules->Item($ind);
 	$settings{"curr_ind"} = $ind;
-	&CreateAndSaveSurfaceAndCharges($document, $molecule, %settings);	
+	&CreateAndSaveSurfaceChargesAndWDVRadii($document, $molecule, %settings);	
 }

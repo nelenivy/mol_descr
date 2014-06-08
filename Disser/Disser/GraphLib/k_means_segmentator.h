@@ -19,7 +19,7 @@ public:
 	void Segment(const GraphType& graph, const IndexMap& index_map, const size_t expected_clust_num, 
 		SegmentsMap& segmented_graph, size_t& actual_clust_num);
 private:
-	static const int kMaxIterations = 1000;
+	static const int kMaxIterations = 3000;
 	void InitForNewData(const GraphType& graph);
 	template <typename IndexMap>
 	void KMeansImpl(const GraphType& graph, const IndexMap& index_map, const size_t clust_num);
@@ -36,7 +36,10 @@ template <typename SegmentsMap, typename IndexMap>
 void KMeansSegmentator<GraphType>::Segment(const GraphType& graph, const IndexMap& index_map,
 					const size_t expected_clust_num, SegmentsMap& segmented_graph, size_t& actual_clust_num)
 {
-	CV_Assert(expected_clust_num);
+	if (expected_clust_num == 0)
+	{
+		return;
+	}
 	InitForNewData(graph);
 	for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; 
 		curr_vert != end_vert; ++curr_vert)

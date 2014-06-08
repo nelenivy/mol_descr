@@ -1,6 +1,8 @@
 #pragma once
+#include "..\stdafx.h"
 #include <utility>
 #include <type_traits>
+#include "shark\Core\IParameterizable.h"
 #include "basic_kernels.h"
 #include "../Common/singular_point.h"
 
@@ -204,7 +206,7 @@ struct KernelForParametersSet : public shark::IParameterizable
 			return;
 		}
 
-		shark::init(new_parameters) >> shark::parameters(m_kernel_1), shark::parameters(m_kernel_2), shark::parameters(m_kernel_3);
+		init(new_parameters) >> shark::blas::parameters(m_kernel_1), shark::blas::parameters(m_kernel_2), shark::blas::parameters(m_kernel_3);
 		CalcParamsVector();
 	}	 
 	/// return the number of hyper-parameters
@@ -215,7 +217,7 @@ protected:
 	void CalcParamsVector()
 	{
 		m_params_vect.resize(m_kernel_1.numberOfParameters() + m_kernel_2.numberOfParameters() + m_kernel_3.numberOfParameters());
-		shark::init(m_params_vect) << shark::parameters(m_kernel_1), shark::parameters(m_kernel_2), shark::parameters(m_kernel_3);
+		init(m_params_vect) << shark::blas::parameters(m_kernel_1), shark::blas::parameters(m_kernel_2), shark::blas::parameters(m_kernel_3);
 	}
 private:
 	Kernel_1 m_kernel_1;

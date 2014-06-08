@@ -1,28 +1,29 @@
 #pragma once
-
+#include "stdafx.h"
 #include <iterator>
 #include <vector>
 #include <type_traits>
 #include <algorithm>
 
-//#include <boost/range/iterator_range.hpp>
 #include <shark/Data/CVDatasetTools.h>
 
 namespace molecule_descriptor
 {
+//////////////////////////////////////////////////////////////////////////
+//labels comparator
+//////////////////////////////////////////////////////////////////////////
+template<typename T>
+struct LabelsCmp;
 
-	//delete conflicts from data. Conflicts are elements,which have equal data, but different labels
+//delete conflicts from data. Conflicts are elements,which have equal data, but different labels
 //conflicts are filled by existing elements
 class DataConflictsDeleter
 {
 public:
-	template <typename T>
-	bool DeleteConflict(shark::LabeledData<T, unsigned int>& data_in);
+	template <typename InputT, typename LabelT, typename LabelsComparator>
+	bool DeleteConflict(shark::LabeledData<InputT, LabelT>& data_in, size_t& conflicts_num, LabelsComparator cmp = LabelsComparator());
 private:
-	std::vector<size_t> m_conflict_positions;
-	std::vector<unsigned char> m_is_conflict;
-	std::vector<size_t> m_positive_class_elems;
-	std::vector<size_t> m_negative_class_elems;
+	std::vector<unsigned char> m_is_conflict;	
 };
 
 enum Labels {kNegativeClass = 0, kPositiveClass = 1};
@@ -45,6 +46,7 @@ shark::LabeledData<typename std::iterator_traits<DataIterT>::value_type, unsigne
 		*iter == 1 ? positives += 1 : negatives += 1;
 	}
 	SHARK_ASSERT(positives > 0 && negatives > 0);
+	std::cout << "positives " << positives <<  " negatives " << negatives << "\n";
 	std::vector<DataType> input_vector;
 	input_vector.reserve(2 * data_size);
 	input_vector.assign(data_begin, data_end);
@@ -79,7 +81,7 @@ shark::LabeledData<typename std::iterator_traits<DataIterT>::value_type, unsigne
 	shark::LabeledData<DataType, unsigned int> labeled_data(input_data, input_labels);
 	return labeled_data;
 }
-
+//////////////////////////////////////////////////////////////////////////
 template <typename VectorType>
 bool AreVectorsSame(const VectorType& vector_1, const VectorType& vector_2)
 {
@@ -90,17 +92,68 @@ bool AreVectorsSame(const VectorType& vector_1, const VectorType& vector_2)
 	bool are_same = true;
 	const size_t size = vector_1.size();
 
-	for (int ind = 0; ind < size; ++ind) {
+	for (size_t ind = 0; ind < size; ++ind) {
 		if (vector_1[ind] != vector_2[ind]) {
 			are_same = false;
+			break;
 		}
 	}
 
 	return are_same;
 }
+//////////////////////////////////////////////////////////////////////////
+template<>
+struct LabelsCmp<unsigned int>
+{
+	typedef unsigned int value_type;
 
+	bool operator()(const value_type elem1, const value_type elem2)
+	{
+		return elem1 == elem2;
+	}
+};
 template <typename T>
-bool DataConflictsDeleter::DeleteConflict(shark::LabeledData<T, unsigned int>& data_in)
+T Sqr(const T num)
+{
+	return num * num;
+}
+template<>
+struct LabelsCmp<shark::RealVector>
+{
+	typedef shark::RealVector value_type;
+	explicit LabelsCmp(const double thresh)
+		: m_thresh(thresh)
+	{	}
+	bool operator()(const value_type& elem1, const value_type& elem2)
+	{
+		CV_Assert(elem1.size() == elem2.size());
+		double diff = 0;
+		for (size_t ind = 0; ind < elem1.size(); ++ind)
+		{
+			diff += Sqr(elem1[ind] - elem2[ind]);
+		} 
+		diff = sqrt(diff);
+
+		return diff < m_thresh;
+	}
+	double m_thresh;
+};
+
+template <typename InputT, typename LabelT>
+LabelsCmp<LabelT> GetLabelsCmp(const shark::LabeledData<InputT, LabelT>& data_in)
+{
+	return LabelsCmp<LabelT>();
+}
+template <typename InputT>
+LabelsCmp<shark::RealVector> GetLabelsCmp(const shark::LabeledData<InputT, shark::RealVector>& data_in)
+{
+	const double thresh = 1e-10;
+	return LabelsCmp<shark::RealVector>(thresh);
+}
+
+//////////////////////////////////////////////////////////////////////////
+template <typename InputT, typename LabelT, typename LabelsComparator>
+bool DataConflictsDeleter::DeleteConflict(shark::LabeledData<InputT, LabelT>& data_in, size_t& conflicts_num, LabelsComparator cmp)
 {
 	if (data_in.numberOfElements() == 0)
 	{
@@ -108,15 +161,10 @@ bool DataConflictsDeleter::DeleteConflict(shark::LabeledData<T, unsigned int>& d
 	}
 
 	const size_t elems_num = data_in.numberOfElements();
-	m_conflict_positions.reserve(elems_num);
-	m_conflict_positions.clear();
-	m_positive_class_elems.reserve(elems_num);
-	m_positive_class_elems.clear();
-	m_negative_class_elems.reserve(elems_num);
-	m_negative_class_elems.clear();
+	
 	m_is_conflict.resize(elems_num);
 	std::fill(m_is_conflict.begin(), m_is_conflict.end(), 0);
-	size_t conflicts_num = 0;
+	conflicts_num = 0;
 
 	//mark conflicts
 	for (size_t ind_1 = 0; ind_1 < elems_num; ++ind_1)
@@ -130,49 +178,70 @@ bool DataConflictsDeleter::DeleteConflict(shark::LabeledData<T, unsigned int>& d
 
 		for (size_t ind_2 = 0; ind_2 < elems_num; ++ind_2)
 		{
-			if (data_in.labels().element(ind_1) != data_in.labels().element(ind_2) &&
+			if (!cmp(data_in.labels().element(ind_1), data_in.labels().element(ind_2)) &&
 				AreVectorsSame(data_in.inputs().element(ind_1), data_in.inputs().element(ind_2))) {
 				m_is_conflict[ind_1] = 1;
 				m_is_conflict[ind_2] = 1;
 				++conflicts_num;
 				break;
 			}
-		}
-
-		if (!m_is_conflict[ind_1]) {
-			if (data_in.labels().element(ind_1) == kPositiveClass) {
-				m_positive_class_elems.push_back(ind_1);
-			} else {
-				m_negative_class_elems.push_back(ind_1);
-			}
-		}
+		}		
 	}
 
-	if (conflicts_num >= elems_num || m_positive_class_elems.size() == 0 || m_negative_class_elems.size() == 0)
+	if (conflicts_num == elems_num)
 	{
 		return false;
 	}
-
-	if (conflicts_num == 0) {
+	if (conflicts_num == 0) 
+	{
 		return true;
 	}
-	//fill conflicts
-	size_t conflict_ind = 0;
-	for (size_t ind = 0; ind < elems_num; ++ind)
+	//////////////////////////////////////////////////////////////////////////
+	//found if there is only one class without conflicts
+	bool are_same = true;
 	{
-		if (!m_is_conflict[ind]) {
-			continue;
+		bool first = true;
+		LabelT prev_label(data_in.labels().element(0));
+		for (size_t ind = 0; ind < m_is_conflict.size() - 1; ++ind)
+		{
+			if (m_is_conflict[ind])
+			{
+				continue;
+			}
+			if (!first && !cmp(data_in.labels().element(ind), prev_label))
+			{
+				are_same = false;
+				break;
+			}
+			first = false;
+			prev_label = data_in.labels().element(ind);			
 		}
-		
-		const std::vector<size_t>& class_to_borrow_elems = conflict_ind % 2 ? m_positive_class_elems : m_negative_class_elems;
-		const size_t index_in_vect = (conflict_ind / 2) % class_to_borrow_elems.size();
-		const size_t index_to_borrow = class_to_borrow_elems[index_in_vect];
-		data_in.labels().element(ind) = data_in.labels().element(index_to_borrow);
-		data_in.inputs().element(ind).assign(data_in.inputs().element(index_to_borrow));//assume that elements are vectors
-		
-		++conflict_ind;
 	}
 
+	if (are_same)
+	{
+		return false;
+	}
+	
+	//delete conflicts
+	std::vector<InputT> inputs_without_confl(elems_num - conflicts_num, data_in.inputs().element(0));
+	std::vector<LabelT> labels_without_confl(elems_num - conflicts_num, data_in.labels().element(0));
+	size_t non_conflict_ind = 0;
+	for (size_t ind = 0; ind < elems_num; ++ind)
+	{
+		if (m_is_conflict[ind]) 
+		{
+			continue;
+		}
+		inputs_without_confl[non_conflict_ind] = data_in.inputs().element(ind);
+		labels_without_confl[non_conflict_ind] = data_in.labels().element(ind);		
+		++non_conflict_ind;
+	}
+
+	shark::Data<InputT> input_data = shark::createDataFromRange(inputs_without_confl);
+	shark::Data<LabelT> input_labels = shark::createDataFromRange(labels_without_confl);
+	shark::LabeledData<InputT, LabelT> new_labeled_data(input_data, input_labels);
+	swap(new_labeled_data, data_in);
 	return true;
 }
 }

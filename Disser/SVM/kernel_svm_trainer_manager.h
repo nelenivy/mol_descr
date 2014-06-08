@@ -1,13 +1,14 @@
 #pragma once
+#include "stdafx.h"
 #include <utility>
 #include <vector>
 #include <fstream>
 #include <array>
-#include "boost/archive/polymorphic_text_oarchive.hpp"
 
 #include "opencv2/core/core.hpp"
 #include "shark/Algorithms/Trainers/CSvmTrainer.h"
 #include "shark/Models/Kernels/KernelExpansion.h"
+#include "shark/Models/Kernels/NormalizedKernel.h"
 #include "shark/ObjectiveFunctions/Loss/ZeroOneLoss.h"
 #include <shark/Data/CVDatasetTools.h>
 #include <shark/Algorithms/DirectSearch/GridSearch.h>
@@ -20,49 +21,8 @@
 #include "modified_grid_search.h"
 #include "prepare_data_for_svm.h"
 #include "zero_one_loss_fuzzy.h"
-
-namespace boost
-{
-	namespace serialization
-	{
-		template <class Archive/*, typename T*/>
-		void serialize(Archive& ar, /*const*/ cv::Point3d/*_<T>*/& point, const unsigned int version)
-		{
-			ar & point.x;
-			ar & point.y;
-			ar & point.z;
-		}
-
-		template <class Archive, typename ElemType/*, typename T*/>
-		void serialize(Archive& ar, /*const*/ /*_<T>*/molecule_descriptor::ElemWithIndexAndID<ElemType>& point, const unsigned int version)
-		{
-			ar & point.Elem();
-		}
-
-		template <class Archive, typename ElemType/*, typename T*/>
-		void serialize(Archive& ar, /*const*/ /*_<T>*/molecule_descriptor::SingularPoint<ElemType>& point, const unsigned int version)
-		{
-			ar & point.GetAsPair();
-		}
-
-		template <class Archive/*, typename T*/>
-		void serialize(Archive& ar, /*const*/ /*_<T>*/molecule_descriptor::PropertiesSet& point, const unsigned int version)
-		{
-			ar & point.SurfaceType();
-			ar & point.Charge();
-			ar & point.ElectricPotential();
-		}
-
-		template <class Archive, typename T, size_t kSize>
-		void serialize(Archive& ar, /*const*/ /*_<T>*/std::array<T, kSize>& point, const unsigned int version)
-		{
-			for (size_t ind = 0; ind < point.size(); ++ind)
-			{
-				ar & point[ind];
-			}
-		}
-	}
-}
+#include "modified_cv_folds.h"
+#include "types_serialization.h"
 
 namespace molecule_descriptor
 {
@@ -81,7 +41,7 @@ public:
 	typedef ElemWithIndexAndID<sing_pts_seq> sing_pts_seq_wth_ind;
 
 	KernelSVMTrainerManager() 
-		: m_kernel_expansion(true), 
+		: m_kernel_expansion(), 
 		m_curr_dataset_id(0)
 	{	}
 
@@ -95,10 +55,11 @@ private:
 
 	int m_curr_dataset_id;
 	shark::LabeledData<sing_pts_seq_wth_ind, unsigned int> m_labeled_data;
-	PharmSequenceKernelPairs<PropType, DistKernel, PropKernel> m_pairs_kernel;	
-	shark::KernelExpansion<sing_pts_seq_wth_ind> m_kernel_expansion;
+	PharmSequenceKernelPairs<PropType, DistKernel, PropKernel> m_pairs_kernel;
+	PharmSequenceKernelTriples<PropType, DistKernel, PropKernel> m_triples_kernel;
+	shark::KernelClassifier<sing_pts_seq_wth_ind> m_kernel_expansion;
 
-	shark::Data<shark::blas::vector<double>> m_eval_result;
+	shark::Data<unsigned int> m_eval_result;
 	double m_training_error;
 };
 
@@ -109,19 +70,10 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::SetData(const ve
 	std::vector<sing_pts_seq_wth_ind> data_wth_ind;
 	CreateSeqWithIndexAndIdFromSeq(data.begin(), data.end(), m_curr_dataset_id, data_wth_ind);
 	++m_curr_dataset_id;
+	/*shark::Data<sing_pts_seq_wth_ind> data_shark = shark::createDataFromRange(data_wth_ind);
+	shark::Data<unsigned int> labels_shark = shark::createDataFromRange(labels);
+	m_labeled_data = shark::LabeledData<sing_pts_seq_wth_ind, unsigned int>(data_shark, labels_shark);*/
 	m_labeled_data = PrepareDataForSVM(data_wth_ind.begin(), data_wth_ind.end(), labels.begin(), labels.end());
-	auto s = m_labeled_data.inputs().elements();
-	/*for (auto it = s.begin(); it != s.end(); ++it)
-	{
-		auto d = it->ElemConst();
-		for (auto it1 = d.begin(); it1 != d.end(); ++it1)
-		{
-			std::cout << it1->Property().SurfaceType();
-		}
-		std::cout << "\n";
-
-
-	}*/
 }
 
 template <typename PropType, class DistKernel, class PropKernel>
@@ -129,6 +81,8 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::SetKernels(DistK
 {
 	PharmSequenceKernelPairs<PropType, DistKernel, PropKernel> pairs_kernel(dist_kernel, prop_kernel);
 	m_pairs_kernel = pairs_kernel;
+	PharmSequenceKernelTriples<PropType, DistKernel, PropKernel> triples_kernel(dist_kernel, prop_kernel);
+	m_triples_kernel = triples_kernel;
 }
 
 template <typename PropType, class DistKernel, class PropKernel>
@@ -136,21 +90,24 @@ void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::Train(const std:
 {
 	//trainer
 	const double C = 0.001;
-	shark::CSvmTrainer<sing_pts_seq_wth_ind> svm_trainer(&m_pairs_kernel, C, true, false);
+	typedef shark::NormalizedKernel<typename PharmSequenceKernelPairs<PropType, DistKernel, PropKernel>::value_type> NormalizedPharmKernel;
+	NormalizedPharmKernel norm_pairs_kernel(&m_pairs_kernel/*m_triples_kernel*/);
+	shark::CSvmTrainer<sing_pts_seq_wth_ind> svm_trainer( &norm_pairs_kernel/*&m_triples_kernel*/, C, true, false);
 	std::cout << svm_trainer.parameterVector();
-	std::cout << m_pairs_kernel.parameterVector();
+	std::cout << m_triples_kernel.parameterVector();
 	// cross-validation error
-	const unsigned int N= 5;//m_labeled_data.elements().size();  // number of folds
-	shark::ZeroOneLoss/*Fuzzy*/<unsigned int, shark::RealVector> loss;//(-1.0, 1.0);
-	shark::CVFolds<shark::LabeledData<sing_pts_seq_wth_ind, unsigned int>> folds = shark::createCVSameSizeBalanced(m_labeled_data, N);
-	shark::CrossValidationError<shark::KernelExpansion<sing_pts_seq_wth_ind>, unsigned int> cv_error(
+	const unsigned int N= m_labeled_data.elements().size() / 2;  // number of folds
+	shark::ZeroOneLossNonAverage/*Fuzzy*/<unsigned int, unsigned int> loss;//(-1.0, 1.0);
+	shark::CVFolds<shark::LabeledData<sing_pts_seq_wth_ind, unsigned int>> folds = shark::createCVSameSizeBalancedIndexedElems
+		/*createCVSameSizeBalanced*/(m_labeled_data, N);
+	shark::CrossValidationErrorElemAv<shark::KernelClassifier<sing_pts_seq_wth_ind>, unsigned int> cv_error(
 		folds, &svm_trainer, &m_kernel_expansion, &svm_trainer, &loss);
 	// find best parameters
 	std::vector<double> min(2);
 	std::vector<double> max(2);
 	std::vector<size_t> sections(2);
-	min[1] = -8; max[1] = -1; sections[1] = 8;  // regularization parameter C
-	min[0] = 0.00001; max[0] = 0.00010; sections[0] = 5;   // kernel parameter gamma
+	min[1] = -8; max[1] = 8; sections[1] = 17;  // regularization parameter C
+	min[0] = 0.1; max[0] = 1.0; sections[0] = 15;   // kernel parameter gamma
 	GridSearchFromEnd grid;
 	grid.configure(min, max, sections);
 	std::ofstream out(file_name + "_res_001_01_all_triangle_triangle.txt");
@@ -169,7 +126,7 @@ template <typename PropType, class DistKernel, class PropKernel>
 void KernelSVMTrainerManager<PropType, DistKernel, PropKernel>::EvaluateTrained()
 {
 	m_eval_result = m_kernel_expansion(m_labeled_data.inputs());
-	shark::ZeroOneLoss<unsigned int, shark::RealVector> loss;
+	shark::ZeroOneLoss<unsigned int, unsigned int> loss;
 	m_training_error = loss.eval(m_labeled_data.labels(), m_eval_result);
 }
 

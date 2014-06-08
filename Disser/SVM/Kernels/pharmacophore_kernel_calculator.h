@@ -2,6 +2,7 @@
 /* this is implementation of the                                                                      */
 /************************************************************************/
 #pragma once
+#include "stdafx.h"
 #include <vector>
 #include <array>
 #include <utility>
@@ -224,6 +225,7 @@ double PharmacophoreKernelBase<PropType>::ProcessTriples()
 	}
 
 	m_curr_triples_kernel_val = std::accumulate(res, res + kMaxThreads, 0.0);
+	//std::cout << m_curr_triples_kernel_val << "\n";
 	return m_curr_triples_kernel_val;
 }
 

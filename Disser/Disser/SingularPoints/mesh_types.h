@@ -21,6 +21,12 @@ namespace boost
 namespace molecule_descriptor
 {
 
+//for proxy container map
+template <typename VertexType>
+struct GetCoord;
+template <typename VertexType>
+struct GetNormal;
+
 struct Vertice
 {
 	Vertice() : coord(cv::Point3d(0, 0, 0)), normal(cv::Point3d(0, 0, 0)) { }
@@ -33,6 +39,35 @@ struct Vertice
 	cv::Point3d coord;
 	cv::Point3d normal;
 };
+
+template <>
+struct GetCoord<Vertice>
+{
+	cv::Point3d& operator()(Vertice& vert) const 
+	{
+		return vert.coord;
+	} 
+	const cv::Point3d& operator()(const Vertice& vert) const {return vert.coord;} 
+};
+template <>
+struct GetNormal<Vertice>
+{
+	cv::Point3d& operator()(Vertice& vert) const 
+	{
+		return vert.normal;
+	} 
+	const cv::Point3d& operator()(const Vertice& vert) const {return vert.normal;} 
+};
+
+inline bool operator==(const Vertice& vert_1, const Vertice& vert_2)
+{
+	return (vert_1.coord == vert_2.coord) && (vert_1.normal == vert_2.normal);
+}
+inline bool operator!=(const Vertice& vert_1, const Vertice& vert_2)
+{
+	return !(vert_1 == vert_2);
+}
+
 
 template <typename VertexDescriptor, class Graph>
 struct Triangle
@@ -122,4 +157,11 @@ typedef boost::subgraph<
 typedef boost::graph_traits<TrianglesGraph>::vertex_descriptor 
 	TriangleDescriptor;
 typedef boost::graph_traits<TrianglesGraph>::vertex_iterator TriangleIter;
+
+struct Mesh
+{
+	VerticesGraph vertices;
+	TrianglesGraph triangles;
+};
+
 }

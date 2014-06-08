@@ -20,14 +20,19 @@
     <ClInclude Include="modified_grid_search.h" />
     <ClInclude Include="kernel_svm_trainer_manager.h" />
     <ClInclude Include="descriptor_svm_trainer.h" />
-    <ClInclude Include="Kernels\cached_kernel.h">
-      <Filter>Kernels</Filter>
-    </ClInclude>
     <ClInclude Include="cross_validation_svm_trainer.h" />
     <ClInclude Include="mgua.h" />
     <ClInclude Include="prepare_data_for_svm.h" />
     <ClInclude Include="zero_one_loss_fuzzy.h" />
-    <ClInclude Include="general_cross_validation.h" />
+    <ClInclude Include="modified_cv_folds.h" />
+    <ClInclude Include="Kernels\pharmacophore_kernel_calc_naive.h">
+      <Filter>Kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="pharm_kernel_naive_configure.h" />
+    <ClInclude Include="types_serialization.h" />
+    <ClInclude Include="zero_one_loss_modified.h" />
+    <ClInclude Include="cross_vaidation_modified.h" />
+    <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Kernels">

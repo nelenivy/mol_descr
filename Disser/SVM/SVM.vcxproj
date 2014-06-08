@@ -85,6 +85,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <AdditionalOptions>-Zm500 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -98,6 +100,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <AdditionalOptions>-Zm500 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -113,6 +117,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <AdditionalOptions>-Zm500 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -130,6 +136,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <AdditionalOptions>-Zm500 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -142,21 +150,26 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cross_vaidation_modified.h" />
     <ClInclude Include="cross_validation_svm_trainer.h" />
     <ClInclude Include="descriptor_svm_trainer.h" />
     <ClInclude Include="element_with_index_and_id.h" />
-    <ClInclude Include="general_cross_validation.h" />
     <ClInclude Include="Kernels\basic_kernels.h" />
-    <ClInclude Include="Kernels\cached_kernel.h" />
     <ClInclude Include="Kernels\kernels_for_points.h" />
     <ClInclude Include="Kernels\pharmacophore_kernel_calculator.h" />
+    <ClInclude Include="Kernels\pharmacophore_kernel_calc_naive.h" />
     <ClInclude Include="Kernels\pharm_kernel_seq_calc.h" />
     <ClInclude Include="Kernels\gramm_matrix_cache.h" />
     <ClInclude Include="mgua.h" />
+    <ClInclude Include="modified_cv_folds.h" />
     <ClInclude Include="modified_grid_search.h" />
     <ClInclude Include="kernel_svm_trainer_manager.h" />
+    <ClInclude Include="pharm_kernel_naive_configure.h" />
     <ClInclude Include="prepare_data_for_svm.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="types_serialization.h" />
     <ClInclude Include="zero_one_loss_fuzzy.h" />
+    <ClInclude Include="zero_one_loss_modified.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Kernels\descriptor_svm_trainer.cpp" />

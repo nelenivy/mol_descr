@@ -1,9 +1,11 @@
 #pragma once
+#include "stdafx.h"
 #include <utility>
 #include <vector>
 
 #include "opencv2/core/core.hpp"
 #include "shark/Models/Kernels/KernelExpansion.h"
+#include "element_with_index_and_id.h"
 //namespace boost
 //{
 //	namespace serialization
@@ -49,10 +51,10 @@ namespace molecule_descriptor
 	public:
 		typedef size_t singular_point;
 		typedef /*std::vector<singular_point>*/RealVector sing_pts_seq;
-		typedef sing_pts_seq/*ElemWithIndexAndID<sing_pts_seq>*/ sing_pts_seq_wth_ind;
+		typedef ElemWithIndexAndID<sing_pts_seq> sing_pts_seq_wth_ind;
 
 		DescriptorSVMTrainerManager() 
-			: m_kernel_expansion(true), 
+			: m_kernel_expansion(), 
 			m_curr_dataset_id(0)
 		{	}
 
@@ -64,8 +66,9 @@ namespace molecule_descriptor
 		void EvaluateTrained();
 
 		int m_curr_dataset_id;
-		shark::LabeledData<sing_pts_seq_wth_ind, unsigned int> m_labeled_data;
-		shark::KernelExpansion<sing_pts_seq_wth_ind> m_kernel_expansion;
+		shark::LabeledData<sing_pts_seq_wth_ind, unsigned int> m_labeled_data_with_ind;
+		shark::LabeledData<sing_pts_seq, unsigned int> m_labeled_data;
+		shark::KernelClassifier<sing_pts_seq/*_wth_ind*/> m_kernel_expansion;
 		shark::Data<shark::blas::vector<double>> m_eval_result;
 		double m_training_error;
 	};

@@ -25,10 +25,10 @@ void MeshKeeper::FillVertices(const vector<cv::Point3d>& vertices, const vector<
 	CV_Assert(vertices.size() == normals.size());
 	//fill vertices
 	m_vertices.resize(vertices.size(), Vertice(cv::Point3d(), cv::Point3d()));
-	auto pmap = get(boost::vertex_info_3d_t(), m_vertices_graph);
+	auto pmap = get(boost::vertex_info_3d_t(), m_mesh.vertices);
 	for (int ind = 0; ind < m_vertices.size(); ind++)
 	{
-		auto added_vertex = boost::add_vertex(m_vertices_graph);
+		auto added_vertex = boost::add_vertex(m_mesh.vertices);
 		pmap[added_vertex].coord = vertices[ind];
 		pmap[added_vertex].normal = normals[ind];		
 	}
@@ -38,16 +38,16 @@ void MeshKeeper::FillTriangles(const vector<Point3i>& triangles)
 {
 	CV_Assert(m_vertices.size());
 	m_triangles_with_indexes = triangles;
-	auto pmap = get(boost::vertex_info_3d_t(), m_triangles_graph);
+	auto pmap = get(boost::vertex_info_3d_t(), m_mesh.triangles);
 
 	for (int ind = 0; ind < m_triangles_with_indexes.size(); ind++)
 	{
-		auto added_triangle = add_vertex(m_triangles_graph);
+		auto added_triangle = add_vertex(m_mesh.triangles);
 		const Point3i& curr_triangle = triangles[ind];
-		const VertexDescriptor a = vertex(curr_triangle.x, m_vertices_graph);
-		const VertexDescriptor b = vertex(curr_triangle.y, m_vertices_graph);
-		const VertexDescriptor c = vertex(curr_triangle.z, m_vertices_graph);
-		pmap[added_triangle] = MeshTriangle(a, b, c, m_vertices_graph);
+		const VertexDescriptor a = vertex(curr_triangle.x, m_mesh.vertices);
+		const VertexDescriptor b = vertex(curr_triangle.y, m_mesh.vertices);
+		const VertexDescriptor c = vertex(curr_triangle.z, m_mesh.vertices);
+		pmap[added_triangle] = MeshTriangle(a, b, c, m_mesh.vertices);
 	}
 }
 
@@ -93,21 +93,21 @@ void MeshKeeper::FillMeshVertices()
 		const int vert_2_ind = iter->y;
 		const int vert_3_ind = iter->z;
 
-		VertexDescriptor vert_1 = boost::vertex(vert_1_ind, m_vertices_graph);
-		VertexDescriptor vert_2 = boost::vertex(vert_2_ind, m_vertices_graph);
-		VertexDescriptor vert_3 = boost::vertex(vert_3_ind, m_vertices_graph);
+		VertexDescriptor vert_1 = boost::vertex(vert_1_ind, m_mesh.vertices);
+		VertexDescriptor vert_2 = boost::vertex(vert_2_ind, m_mesh.vertices);
+		VertexDescriptor vert_3 = boost::vertex(vert_3_ind, m_mesh.vertices);
 
-		if (!edge(vert_1, vert_2, m_vertices_graph).second)
+		if (!edge(vert_1, vert_2, m_mesh.vertices).second)
 		{
-			add_edge(vert_1, vert_2, m_vertices_graph);
+			add_edge(vert_1, vert_2, m_mesh.vertices);
 		}
-		if (!edge(vert_1, vert_3, m_vertices_graph).second)
+		if (!edge(vert_1, vert_3, m_mesh.vertices).second)
 		{
-			add_edge(vert_1, vert_3, m_vertices_graph);
+			add_edge(vert_1, vert_3, m_mesh.vertices);
 		}
-		if (!edge(vert_2, vert_3, m_vertices_graph).second)
+		if (!edge(vert_2, vert_3, m_mesh.vertices).second)
 		{
-			add_edge(vert_2, vert_3, m_vertices_graph);
+			add_edge(vert_2, vert_3, m_mesh.vertices);
 		}
 	}	
 }
@@ -117,7 +117,7 @@ void MeshKeeper::FillMeshTriangles()
 	CV_Assert(m_vertices.size() && m_triangles_with_indexes.size());
 
 	FindTriangleNeighboursOfEachVertex();
-	const auto pmap = get(boost::vertex_info_3d, m_triangles_graph);
+	const auto pmap = get(boost::vertex_info_3d, m_mesh.triangles);
 	for (int ind_vect = 0; ind_vect < m_triangle_neighb_of_vertex.size(); ind_vect++)
 	{
 		const vector<int>& curr_neighbours = m_triangle_neighb_of_vertex[ind_vect];
@@ -125,7 +125,7 @@ void MeshKeeper::FillMeshTriangles()
 		for (int ind_curr = 0; ind_curr < curr_neighbours.size(); ind_curr++)
 		{//find neighbour triangles for each triangle
 			const int curr_triangle_ind = curr_neighbours[ind_curr];
-			const TriangleDescriptor curr_triangle = boost::vertex(curr_triangle_ind, m_triangles_graph);
+			const TriangleDescriptor curr_triangle = boost::vertex(curr_triangle_ind, m_mesh.triangles);
 
 			for (int ind_neighb = 0; ind_neighb < curr_neighbours.size(); ind_neighb++)
 			{
@@ -135,13 +135,13 @@ void MeshKeeper::FillMeshTriangles()
 				}
 
 				const int neighb_triangle_ind = curr_neighbours[ind_neighb];
-				const TriangleDescriptor neighb_triangle = boost::vertex(neighb_triangle_ind, m_triangles_graph);
+				const TriangleDescriptor neighb_triangle = boost::vertex(neighb_triangle_ind, m_mesh.triangles);
 
 				if (CountSameVertices(pmap[neighb_triangle], pmap[curr_triangle]) == 2)
 				{
-					if (!edge(neighb_triangle, curr_triangle, m_triangles_graph).second)
+					if (!edge(neighb_triangle, curr_triangle, m_mesh.triangles).second)
 					{
-						add_edge(neighb_triangle, curr_triangle, m_triangles_graph);
+						add_edge(neighb_triangle, curr_triangle, m_mesh.triangles);
 					}
 				}
 			}
@@ -151,8 +151,8 @@ void MeshKeeper::FillMeshTriangles()
 
 void MeshKeeper::Clear()
 {
-	m_vertices_graph = VerticesGraph();
-	m_triangles_graph = TrianglesGraph();
+	m_mesh.vertices = VerticesGraph();
+	m_mesh.triangles = TrianglesGraph();
 	m_vertices.clear();
 	m_triangles_with_indexes.clear();
 	m_triangle_neighb_of_vertex.clear();

@@ -55,12 +55,16 @@ void ReadMatrix(cv::Mat_<T>& matrix, const std::string& filename)
 	std::getline(in_file, row);
 	std::stringstream row_stream(row);
 	int columns = 0;
-	T buf;
+	typedef typename std::conditional<std::is_same<T, uint8_t>::value, uint32_t,
+		typename std::conditional<std::is_same<T, int8_t>::value, int32_t, T>::type
+	>::type BufType;//to avoid reading int8_t as chars
+	BufType buf;
 
 	for (; !row_stream.eof(); ++columns)
 	{
 		row_stream >> buf;
 	}
+	--columns;
 	//
 	in_file.close();
 	in_file.open(filename);
@@ -154,6 +158,31 @@ struct ReadElemNonChecked<std::tuple<T1, T2, T3>>
 		ReadElemNonChecked<T1>::Do(file_in, std::get<0>(new_elem));
 		ReadElemNonChecked<T2>::Do(file_in, std::get<1>(new_elem));
 		ReadElemNonChecked<T3>::Do(file_in, std::get<2>(new_elem));
+	}
+};
+template <typename T1, typename T2, typename T3, typename T4>
+struct ReadElemNonChecked<std::tuple<T1, T2, T3, T4>>
+{
+	static inline void Do(std::ifstream& file_in, std::tuple<T1, T2, T3, T4>& new_elem)
+	{
+		//ReadTupleIndexNonChecked<3, T1, T2, T3>(file_in, new_elem);
+		ReadElemNonChecked<T1>::Do(file_in, std::get<0>(new_elem));
+		ReadElemNonChecked<T2>::Do(file_in, std::get<1>(new_elem));
+		ReadElemNonChecked<T3>::Do(file_in, std::get<2>(new_elem));
+		ReadElemNonChecked<T4>::Do(file_in, std::get<3>(new_elem));
+	}
+};
+template <typename T1, typename T2, typename T3, typename T4, typename T5>
+struct ReadElemNonChecked<std::tuple<T1, T2, T3, T4, T5>>
+{
+	static inline void Do(std::ifstream& file_in, std::tuple<T1, T2, T3, T4, T5>& new_elem)
+	{
+		//ReadTupleIndexNonChecked<3, T1, T2, T3>(file_in, new_elem);
+		ReadElemNonChecked<T1>::Do(file_in, std::get<0>(new_elem));
+		ReadElemNonChecked<T2>::Do(file_in, std::get<1>(new_elem));
+		ReadElemNonChecked<T3>::Do(file_in, std::get<2>(new_elem));
+		ReadElemNonChecked<T4>::Do(file_in, std::get<3>(new_elem));
+		ReadElemNonChecked<T5>::Do(file_in, std::get<4>(new_elem));
 	}
 };
 template <typename T, size_t kArrSize>
@@ -260,6 +289,33 @@ struct WriteElemToFile<std::tuple<T1, T2, T3>>
 		/*WriteTupleIndexToFile<3>(file_out, elem);*/
 	}
 };
+template <typename T1, typename T2, typename T3, typename T4>
+struct WriteElemToFile<std::tuple<T1, T2, T3, T4>>
+{
+	inline void operator()(std::ofstream& file_out, const std::tuple<T1, T2, T3, T4>& elem)
+	{
+		/*typedef typename std::tuple_element<kCurrIndex, std::tuple<Types...>> CurrentElemType;*/
+		WriteElemToFile<T1>()(file_out, std::get<0>(elem));
+		WriteElemToFile<T2>()(file_out, std::get<1>(elem));
+		WriteElemToFile<T3>()(file_out, std::get<2>(elem));
+		WriteElemToFile<T4>()(file_out, std::get<3>(elem));
+		/*WriteTupleIndexToFile<3>(file_out, elem);*/
+	}
+};
+template <typename T1, typename T2, typename T3, typename T4, typename T5>
+struct WriteElemToFile<std::tuple<T1, T2, T3, T4, T5>>
+{
+	inline void operator()(std::ofstream& file_out, const std::tuple<T1, T2, T3, T4, T5>& elem)
+	{
+		/*typedef typename std::tuple_element<kCurrIndex, std::tuple<Types...>> CurrentElemType;*/
+		WriteElemToFile<T1>()(file_out, std::get<0>(elem));
+		WriteElemToFile<T2>()(file_out, std::get<1>(elem));
+		WriteElemToFile<T3>()(file_out, std::get<2>(elem));
+		WriteElemToFile<T4>()(file_out, std::get<3>(elem));
+		WriteElemToFile<T5>()(file_out, std::get<4>(elem));
+		/*WriteTupleIndexToFile<3>(file_out, elem);*/
+	}
+};
 
 template <typename T, size_t kArrSize>
 struct WriteElemToFile<std::array<T, kArrSize>>
@@ -269,6 +325,18 @@ struct WriteElemToFile<std::array<T, kArrSize>>
 		for (size_t ind = 0; ind < kArrSize; ++ind)
 		{
 			WriteElemToFile<T>()(file_out, elem[ind]);
+		}
+	}
+};
+
+template <size_t kArrSize>
+struct WriteElemToFile<std::array<uint8_t, kArrSize>>
+{
+	inline void operator()(std::ofstream& file_out, const std::array<uint8_t, kArrSize>& elem)
+	{
+		for (size_t ind = 0; ind < kArrSize; ++ind)
+		{
+			WriteElemToFile<int>()(file_out, elem[ind]);
 		}
 	}
 };

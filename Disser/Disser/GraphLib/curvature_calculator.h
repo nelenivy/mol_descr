@@ -38,11 +38,13 @@ public:
 	//friend struct CurvatureCalculatorHelper<GraphType, CubicCurvature>;
 
 	CurvatureCalculator(const int max_neighbours_num);
-	void CalculateCurvatureCubic(const GraphType& graph, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
-	void CalculateCurvatureParabolloid(const GraphType& graph, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
+	template <typename CoordMapT>
+	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
+	template <typename CoordMapT>
+	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
 private:
-	template <class CurvatureType>
-	void CalculateCurvatureImpl(const GraphType& graph, const VertexDescr mesh_vertices, Vec2d& curvature_matr);
+	template <class CurvatureType, typename CoordMapT>
+	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertices, Vec2d& curvature_matr);
 	template <class Info3DType, class CurvatureType>
 	void FillEquationMatrices(const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
 	template <class CurvatureType>
@@ -100,22 +102,24 @@ CurvatureCalculator<NodeType>::CurvatureCalculator(const int max_neighbours_num)
 }
 
 template <class GraphType>
-void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph,
+template <typename CoordMapT>
+void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map,
 	const VertexDescr mesh_vertices, cv::Vec2d& curvature_matr)
 {
-	CalculateCurvatureImpl<CubicCurvature>(graph, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<CubicCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
 }
 
 template <class GraphType>
-void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph,
+template <typename CoordMapT>
+void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map,
 	const VertexDescr mesh_vertices, cv::Vec2d& curvature_matr)
 {
-	CalculateCurvatureImpl<ParabolloidCurvature>(graph, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<ParabolloidCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
 }
 
 template <class GraphType>
-template <class CurvatureType>
-void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph,
+template <class CurvatureType, typename CoordMapT>
+void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map,
 	const VertexDescr mesh_vertices, cv::Vec2d& curvature_values)
 {
 	typedef boost::graph_traits<GraphType>::adjacency_iterator AdjacencyIter;
@@ -129,9 +133,8 @@ void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& gra
 	}
 
 	ReservePlace<CurvatureType>(m_max_neighbours_num);
-	const auto pmap = get(boost::vertex_info_3d, graph);
-	Point_ToMat_Transposed(pmap[mesh_vertices].Normal(), m_curr_normal);
-	Point_ToMat_Transposed(pmap[mesh_vertices].Center(), m_curr_coord);
+	Point_ToMat_Transposed(coord_map[mesh_vertices].Normal(), m_curr_normal);
+	Point_ToMat_Transposed(coord_map[mesh_vertices].Center(), m_curr_coord);
 	//find coordinate transformation
 	m_rotat_mat = m_E - m_curr_normal * m_curr_normal.t();
 
@@ -153,13 +156,13 @@ void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& gra
 	boost::tie(curr_neighbour, last) = adjacent_vertices(mesh_vertices, graph);
 	const size_t neighb_num = out_degree(mesh_vertices, graph);
 	ReservePlace<CurvatureType>(static_cast<int>(neighb_num));
-	typedef decltype(pmap[mesh_vertices]) Info3DType;
+	typedef decltype(coord_map[mesh_vertices]) Info3DType;
 	for (; curr_neighbour != last; ++curr_neighbour)
 	{ 
 		const size_t neighb_ind = neighb_num - (last - curr_neighbour);
 		FillEquationMatrices<Info3DType, CurvatureType>(
-			pmap[mesh_vertices], 
-			pmap[*curr_neighbour], 
+			coord_map[mesh_vertices], 
+			coord_map[*curr_neighbour], 
 			m_coefficient_matrix[CurvatureType::kRowsForOneElement * neighb_ind],
 			m_z_vect[CurvatureType::kRowsForOneElement * neighb_ind]);
 	}

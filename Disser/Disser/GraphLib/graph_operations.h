@@ -10,38 +10,88 @@
 namespace molecule_descriptor
 {
 template <typename GraphType, typename SubgraphMaskMap>
-void CreateSubgraph(boost::subgraph<GraphType>& graph, const SubgraphMaskMap& subgraph_mask, 
-					boost::subgraph<GraphType>& subgraph);
+void CreateSubgraphFromMask(boost::subgraph<GraphType>& graph, const SubgraphMaskMap& subgraph_mask, 
+	const typename boost::property_traits<SubgraphMaskMap>::value_type subgraph_mark,
+	boost::subgraph<GraphType>& subgraph);
 template <typename GraphType, typename SegmentsMap>
 void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_to_split, const size_t parts_num, 
 				  SegmentsMap& segm_map, size_t& segments_num);
 template <typename GraphType, typename SegmentsMap, typename CentersGraph>
-void CalculateSegmentGraphAndCenters(const GraphType& graph, const SegmentsMap& segments_map, 
-									 std::vector<typename boost::graph_traits<GraphType>::vertex_descriptor>& centers, 
+void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, const SegmentsMap& segments_map, 
+									 std::vector<typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descriptor>& centers, 
 									 CentersGraph& centers_graph);
 
 template <typename GraphType, typename SubgraphMaskMap>
-void CreateSubgraph(boost::subgraph<GraphType>& graph, const SubgraphMaskMap& subgraph_mask, 
+void CreateSubgraphFromMask(boost::subgraph<GraphType>& graph, const SubgraphMaskMap& subgraph_mask, 
+							const typename boost::property_traits<SubgraphMaskMap>::value_type subgraph_mark,
 					boost::subgraph<GraphType>& subgraph)
 {
 	subgraph = graph.create_subgraph();
 	typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_iterator curr_vert, end_vert;
 	for (boost::tie(curr_vert, end_vert) = vertices(graph); curr_vert != end_vert; ++curr_vert)
 	{
-		if (static_cast<bool>(subgraph_mask[*curr_vert]) == true)
+		if (subgraph_mask[*curr_vert] == subgraph_mark)
 		{
 			add_vertex(*curr_vert, subgraph);
 		}
 	}	
 }
 
+template <typename GraphType, typename SegmentsMap, typename CoordMap>
+std::pair<typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descriptor, bool>
+	CalculateSegmentCenter(boost::subgraph<GraphType>& graph, const SegmentsMap& segm_map, 
+							const typename boost::property_traits<SegmentsMap>::value_type curr_segm,
+							const CoordMap& coord_map)
+{
+	typedef typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descriptor vertex_descriptor;
+	boost::subgraph<GraphType> subgraph;
+	CreateSubgraphFromMask(graph, segm_map, curr_segm, subgraph);
+
+	if (num_vertices(subgraph) == 0)
+	{
+		return make_pair(vertex_descriptor(), false);
+	}
+	ContPropMap<boost::subgraph<GraphType>, std::vector<double>, EDGE> edge_distances(subgraph);
+	std::fill(edge_distances.begin(), edge_distances.end(), 0.0);
+
+	for (auto curr_edge = edges(subgraph).first, edge_end = edges(subgraph).second; curr_edge != edge_end; ++curr_edge)
+	{
+		const vertex_descriptor v1 = source(*curr_edge, subgraph);
+		const vertex_descriptor v2 = target(*curr_edge, subgraph);
+		const double curr_dist = Distance(coord_map[subgraph.local_to_global(v1)], coord_map[subgraph.local_to_global(v2)]);
+		edge_distances[*curr_edge] = curr_dist;
+	}
+	cv::Mat_<float> dist_mat;
+	CalcDistMatr(subgraph, get(boost::vertex_index, subgraph), edge_distances, 
+		std::numeric_limits<float>::max(), 0.0, dist_mat);
+
+	int min_pos = 0;
+	double min_dist = std::numeric_limits<double>::max();
+	for (int y = 0; y < dist_mat.rows; ++y)
+	{
+		double sum_dist = 0;
+		for (int x = 0; x < dist_mat.cols;++x)
+		{
+			sum_dist += dist_mat(y, x);
+		}
+		if (sum_dist < min_dist)
+		{
+			min_pos = y;
+			min_dist = sum_dist;
+		}
+	}
+
+	const vertex_descriptor local_cent = vertex(min_pos, subgraph);
+	return make_pair(subgraph.local_to_global(local_cent), true);
+}
+
 template <typename GraphType, typename SegmentsMap>
 void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_to_split, const size_t parts_num, 
 				  SegmentsMap& segm_map, size_t& segments_num)
 {
+	CV_Assert(parts_num > 0);
 	ContPropMap<boost::subgraph<GraphType>, std::vector<bool>, VERTEX> subgraph_mask(graph);
 
-	typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_iterator curr_vert, end_vert;
 	for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
 	{//mark necessary nodes
 		subgraph_mask[*curr_vert] = segm_map[*curr_vert] == segment_to_split ? true : false;
@@ -50,7 +100,7 @@ void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_
 	//segment using k_means
 	boost::subgraph<GraphType> graph_copy = graph;
 	boost::subgraph<GraphType> subgraph;
-	CreateSubgraph(graph_copy, subgraph_mask, subgraph);
+	CreateSubgraphFromMask(graph_copy, subgraph_mask, true, subgraph);
 
 	if (num_vertices(subgraph) == 0)
 	{
@@ -61,6 +111,11 @@ void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_
 	ContPropMap<boost::subgraph<GraphType>, std::vector<size_t>, VERTEX> segmented_subgraph(subgraph);
 	size_t new_segments_num = 0;
 	kmeans_segmentator.Segment(subgraph, get(boost::vertex_index, subgraph), parts_num, segmented_subgraph, new_segments_num);
+
+	if (new_segments_num == 0)
+	{
+		return;
+	}
 	//write segments back
 	//renum segments
 	std::vector <size_t> segments_map(new_segments_num + 1, 0);
@@ -80,13 +135,12 @@ void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_
 }
 
 template <typename GraphType, typename SegmentsMap, typename CentersGraph>
-void CalculateSegmentGraphAndCenters(const GraphType& graph, const SegmentsMap& segments_map, 
-	std::vector<typename boost::graph_traits<GraphType>::vertex_descriptor>& centers, 
+void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, const SegmentsMap& segments_map, 
+	std::vector<typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descriptor>& centers, 
 	CentersGraph& centers_graph)
 {
 	//find clusters number
 	size_t clust_num = 0;
-
 	for (auto node_iter = vertices(graph).first, graph_end = vertices(graph).second; node_iter != graph_end; ++node_iter)
 	{
 		const size_t curr_segm_num = segments_map[*node_iter];
@@ -97,60 +151,21 @@ void CalculateSegmentGraphAndCenters(const GraphType& graph, const SegmentsMap& 
 		}
 	}
 
-	//calculate new centers as mean of the cluster coordinates
-	std::vector<cv::Point3d> actual_centers(clust_num + 1, cv::Point3d(0.0, 0.0, 0.0));//clust + 1 because clusters numbers go from 1
-	std::vector<size_t> curr_clust_sizes(clust_num + 1, 0);
-
-	for (auto node_iter = vertices(graph).first, graph_end = vertices(graph).second; node_iter != graph_end; ++node_iter)
-	{
-		const size_t curr_clust_num = segments_map[*node_iter];
-
-		if (curr_clust_num > 0)
-		{
-			actual_centers[curr_clust_num] += get(boost::vertex_info_3d, graph, *node_iter).Center();
-			curr_clust_sizes[curr_clust_num]++;
-		}
-	}
-
-	for (size_t curr_clust = 1; curr_clust <= clust_num; ++curr_clust)
-	{
-		if (curr_clust_sizes[curr_clust])
-		{
-			actual_centers[curr_clust] *= 1.0 / curr_clust_sizes[curr_clust];
-		}
-	}
-
-	//find the nearest point from the set to the actual center
-	const double kMaxDist = 1000000.0;
-	typedef typename boost::graph_traits<GraphType>::vertex_descriptor vertex_descriptor;
-	std::vector<std::pair<double, vertex_descriptor>> min_dist_to_center(clust_num + 1, make_pair(kMaxDist, vertex_descriptor()));
-	//minimum distance on the first place, index on the second
-
-	for (auto node_iter = vertices(graph).first, graph_end = vertices(graph).second; node_iter != graph_end; ++node_iter)
-	{
-		const size_t curr_clust_num = segments_map[*node_iter];
-
-		if (curr_clust_num > 0)
-		{
-			const double curr_dist_to_center = cv::norm(get(boost::vertex_info_3d, graph, *node_iter).Center() - actual_centers[curr_clust_num]);
-
-			if (curr_dist_to_center < min_dist_to_center[curr_clust_num].first)
-			{
-				min_dist_to_center[curr_clust_num] = make_pair(curr_dist_to_center, *node_iter);
-			}
-		}
-	}
-
-	//write found nodes to the output vector
+	//calculate new centers
 	centers.resize(clust_num);
 	std::vector<typename boost::graph_traits<CentersGraph>::vertex_descriptor> centers_nums(clust_num + 1);
 	centers_graph = CentersGraph();
 	size_t non_zero_cluster = 0;
+	boost::subgraph<GraphType> graph_copy = graph;
+
 	for (size_t curr_clust = 1; curr_clust <= clust_num; ++curr_clust)
 	{
-		if (curr_clust_sizes[curr_clust])
+		const auto res = CalculateSegmentCenter(graph_copy, segments_map, curr_clust,
+			get(boost::vertex_info_3d, graph_copy));
+
+		if (res.second == true)
 		{
-			centers[non_zero_cluster] = min_dist_to_center[curr_clust].second;
+			centers[non_zero_cluster] = res.first;
 			const auto added = add_vertex(centers_graph);
 			centers_nums[curr_clust] = added;
 			put(boost::vertex_info_3d, centers_graph, added, 

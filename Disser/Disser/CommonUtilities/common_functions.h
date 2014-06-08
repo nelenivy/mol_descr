@@ -57,7 +57,7 @@ void Point_ToMat_Transposed(const cv::Point_<T>& point, cv::Mat_<T>& mat)
 }
 
 template<typename IteratorType>
-size_t CalculateType(IteratorType types_begin, IteratorType types_end, 
+size_t CalculateRangeType(IteratorType types_begin, IteratorType types_end, 
 						  IteratorType max_vals_begin, IteratorType max_vals_end)
 {
 	CV_Assert(types_end - types_begin == max_vals_end - max_vals_begin);

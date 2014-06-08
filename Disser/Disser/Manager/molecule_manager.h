@@ -24,7 +24,18 @@ public:
 	{
 		m_dist_threshes = dist_threshes_;
 	}
-	void FindSingularPoints(const bool calculate);
+	void SetChargesThresholds(const std::vector<double>& charges_threshes_)
+	{
+		m_charge_threshes = charges_threshes_;
+	}
+	void SetLennardJonesThresholds(const std::vector<double>& lennard_jones_threshes_)
+	{
+		m_lennard_jones_threshes = lennard_jones_threshes_;
+	}
+	void FindSingularPoints(const bool calculate, const bool calc_as_average);
+	void ReadAllSingularPoints();
+	size_t GetPointsTypeNum();
+	void ClassifySingularPoints();
 	void GetSingularPoints(std::vector<MarkedSingularPoint>& sing_points) 
 	{
 		sing_points = m_singular_points;
@@ -32,7 +43,7 @@ public:
 
 	void GetNonMarkedSingularPoints(std::vector<NonMarkedSingularPoint>& sing_points) 
 	{
-		sing_points = m_non_marked_singular_points;
+		sing_points = m_non_marked_singular_points.first;
 	}
 	template <size_t kArrSize>
 	void GetHistogramSingularPoints(std::vector<HistogramSingularPoint<kArrSize>>& sing_points) 
@@ -41,16 +52,28 @@ public:
 	}
 
 	void AppendDistances(std::vector<double>& distances);
+	void AppendCharges(std::vector<double>& charges);
+	void AppendLennardJones(std::vector<double>& lennard_jones);
+	void CalculatePropertiesTypes();
 	void CalculatePairsWithTypes();
 	void FindPairs(const bool calculate);
 	size_t GetPairsTypeNum();
 	void GetPairsHistogramm(cv::Mat_<size_t>& histogram);
-
+	void GetNonMarkedPairs(std::vector<SingularPointsPair<PropertiesSet>>& non_marked_pairs)
+	{
+		non_marked_pairs = m_sing_pts_pairs_with_props_and_types.first;
+	}
+	void GetPairsTypes(std::vector<size_t>& pairs_types)
+	{
+		pairs_types = m_sing_pts_pairs_with_props_and_types.second;
+	}
 	void CalculateTriplesWithTypes();
 	void FindTriples(const bool calculate);
 	size_t GetTriplesTypeNum();
 	void GetTriplesHistogramm(cv::Mat_<size_t>& histogram);
 private:
+	int CalculateSingularPointsTypes(PropertiesSet& prop);
+
 	void Clear();
 	void CalculateTriples();
 	void WriteTriples();
@@ -59,9 +82,7 @@ private:
 	void CalculatePairs();
 	void WritePairs();
 	void ReadPairs();
-	size_t CalculateDistanceType(const double distance);
-	void CalculateSingularPoints();
-	void ReadSingularPoints();
+	void CalculateSingularPoints(const bool calc_as_average);
 	void WriteSingularPoints();
 	void WriteSegmentedSurface();
 	void WriteTriangles(const std::vector<cv::Point3i>& triangles);
@@ -80,10 +101,12 @@ private:
 	typedef std::tuple<triangle_side_with_type, triangle_side_with_type, triangle_side_with_type> triangle_with_type;
 
 	std::vector<point_with_type> m_singular_points;
-	std::vector<NonMarkedSingularPoint> m_non_marked_singular_points;
+	std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>> m_non_marked_singular_points;
 	std::vector<HistogramSingularPoint<kHistSize>> m_histogram_singular_points;
+	std::pair<std::vector<SingularPointsPair<PropertiesSet>>, std::vector<size_t>> m_sing_pts_pairs_with_props_and_types;
 	std::vector<pair_with_distance> m_pairs;
 	std::vector<pair_with_distance_type> m_pairs_with_types;
+	std::vector<size_t> m_types;
 	std::vector<size_t> m_pairs_histogram;
 
 	std::vector<triangle> m_triples;
@@ -92,6 +115,8 @@ private:
 
 	std::string m_curr_file_prefix;
 	std::vector<double> m_dist_threshes;
+	std::vector<double> m_charge_threshes;
+	std::vector<double> m_lennard_jones_threshes;
 };
 
 }

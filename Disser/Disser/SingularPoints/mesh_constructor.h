@@ -17,8 +17,7 @@ class MeshKeeper
 public:
 	MeshKeeper() { }
 	void ConstructMesh(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, const std::vector<cv::Point3i>& triangles);
-	const VerticesGraph& GetMeshVertices() {return m_vertices_graph; }
-	const TrianglesGraph& GetMeshTriangles() {return m_triangles_graph; }
+	const Mesh& GetMesh() {return m_mesh; }
 private:
 	MeshKeeper(const MeshKeeper&){};
 	MeshKeeper& operator=(const MeshKeeper&){};
@@ -29,8 +28,7 @@ private:
 	void FillMeshVertices();
 	void FillMeshTriangles();
 private:
-	VerticesGraph m_vertices_graph;
-	TrianglesGraph m_triangles_graph;
+	Mesh m_mesh;	
 	std::vector<Vertice>	m_vertices;
 	std::vector<cv::Point3i>	m_triangles_with_indexes;
 

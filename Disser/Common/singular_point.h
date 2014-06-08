@@ -56,11 +56,13 @@ private:
 	std::pair<cv::Point3d, PropType> m_singular_point;
 };
 
+//mark curvature type
+enum CurvatureTypes {kConvexType = 1, kConcaveType = 2, kSaddleType = 3};
 
 class PropertiesSet
 {
 public:
-	typedef std::tuple<size_t, int, float> tuple_type;
+	typedef std::tuple<size_t, int, float, int, float> tuple_type;
 	inline size_t& SurfaceType() {
 		return std::get<0>(m_properties);
 	}
@@ -81,19 +83,39 @@ public:
 	inline const float& ElectricPotential() const {
 		return std::get<2>(m_properties);
 	}
+	inline int& LennardJonesType() {
+		return std::get<3>(m_properties);
+	}
+	inline const int& LennardJonesType() const {
+		return std::get<3>(m_properties);
+	}
+	inline float& LennardJones() {
+		return std::get<4>(m_properties);
+	}
+	inline const float& LennardJones() const {
+		return std::get<4>(m_properties);
+	}
 
-	inline std::tuple<size_t, int, float>& GetAsTuple()//for convinience
+	inline tuple_type& GetAsTuple()//for convinience
 	{
 		return m_properties;
 	}
-	inline const std::tuple<size_t, int, float>& GetAsTuple() const//for convinience
+	inline const tuple_type& GetAsTuple() const//for convinience
 	{
 		return m_properties;
 	}
 private: 
-	std::tuple<size_t, int, float> m_properties;
+	tuple_type m_properties;
 };
 
+inline bool operator ==(const PropertiesSet& p1, const PropertiesSet& p2)
+{
+	return (p1.Charge() == p2.Charge()) &&
+		(p1.ElectricPotential() == p2.ElectricPotential())
+		&& (p1.SurfaceType() == p2.SurfaceType())
+		&& (p1.LennardJonesType() == p2.LennardJonesType())
+		&& (p1.LennardJones() == p2.LennardJones());
+}
 template <typename PropType>
 struct WriteElemToFile<SingularPoint<PropType>>;
 template <typename PropType>
@@ -126,7 +148,7 @@ struct WriteElemToFile<PropertiesSet>
 {
 	inline void operator()(std::ofstream& file_out, const PropertiesSet& elem)
 	{
-		WriteElemToFile<std::tuple<size_t, int, float>>()(file_out, elem.GetAsTuple());
+		WriteElemToFile<PropertiesSet::tuple_type>()(file_out, elem.GetAsTuple());
 	}
 };
 //specialization of input
@@ -135,7 +157,7 @@ struct ReadElemNonChecked<PropertiesSet>
 {
 	static inline void Do(std::ifstream& file_in, PropertiesSet& new_elem)
 	{
-		ReadElemNonChecked<std::tuple<size_t, int, float>>::Do(file_in, new_elem.GetAsTuple());
+		ReadElemNonChecked<PropertiesSet::tuple_type>::Do(file_in, new_elem.GetAsTuple());
 	}
 };
 //singular point with histogram
@@ -163,6 +185,28 @@ struct ReadElemNonChecked<HistogramSingularPoint<kHistSize>>
 		ReadElemNonChecked<SingularPoint<std::array<uint8_t, kHistSize>>>::Do(file_in, new_elem);
 	}
 };
+//////////////////////////////////////////////////////////////////////////
+template <typename PropT>
+struct SingularPointsPair
+{
+	PropT elem1;
+	PropT elem2;
+	double dist;
+};
+
+template <typename T>
+bool operator ==(const SingularPointsPair<T>& t1, const SingularPointsPair<T>& t2)
+{
+	return ((t1.elem1 == t2.elem1 && t1.elem2 == t2.elem2) || 
+		(t1.elem1 == t2.elem2 && t1.elem2 == t2.elem1)) && (t1.dist == t2.dist);
+}
+template <typename T>
+bool operator !=(const SingularPointsPair<T>& t1, const SingularPointsPair<T>& t2)
+{
+	return !(t1 == t2);
+}
+//////////////////////////////////////////////////////////////////////////
+
 typedef SingularPoint<size_t> MarkedSingularPoint;
 typedef SingularPoint<PropertiesSet> NonMarkedSingularPoint;
 

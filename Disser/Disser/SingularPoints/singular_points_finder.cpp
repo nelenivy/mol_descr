@@ -3,12 +3,14 @@
 #include <algorithm>
 
 #include "SingularPoints/mesh_types.h"
+#include "SingularPoints\mesh_operations.h"
 #include "GraphLib\connected_components_segmentator.h"
 #include "GraphLib\graph_operations.h"
-
+#include "GraphLib\graph_filter.h"
 #include "GraphLib\curvature_calculator.h"
-
-#include "singular_point_types.h"
+#include "GraphLib\proxy_property_map.h"
+#include "GraphLib\graph_functions.h"
+#include "CommonUtilities\common_functions.h"
 
 namespace molecule_descriptor
 {
@@ -22,88 +24,178 @@ std::shared_ptr<ISingularPointsFinder> CreateSingularPointsFinder()
 	return std::shared_ptr<ISingularPointsFinder>(instance, ReleaseDeleter());
 }
 
-double CalculatePotential(const cv::Point3d& point, const std::vector<std::pair<cv::Point3d, double>>& charges)
+cv::Point3d CalculatePotential(const cv::Point3d& point, const std::vector<std::pair<cv::Point3d, double>>& charges)
 {
-	double potential = 0.0;
+	cv::Point3d force = 0.0;
 
 	for (auto charges_iter = charges.begin(); charges_iter != charges.end(); ++charges_iter)
 	{
-		const double curr_dist = cv::norm(point - charges_iter->first) + 0.00000001;
-		potential += charges_iter->second / curr_dist;
+		const cv::Point3d curr_vect = charges_iter->first - point;
+		const double inverse_dist = 1.0 / (cv::norm(curr_vect) + 0.00000001);
+		const cv::Point3d curr_direction = curr_vect * inverse_dist;
+		force += curr_direction * charges_iter->second * (inverse_dist * inverse_dist);
+	}
+
+	return force;
+}
+
+double CalculateLennardJonesPotential(const cv::Point3d& point, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const double probe_radius)
+{
+	double potential = 0.0;
+
+	for (auto radius_iter = wdv_radii.begin(); radius_iter != wdv_radii.end(); ++radius_iter)
+	{
+		const cv::Point3d curr_vect = radius_iter->first - point;
+		const double inverse_dist = 1.0 / (cv::norm(curr_vect) + 0.00000001);
+		const double sigma = (radius_iter->second + probe_radius) / 2.0;
+		potential += pow(sigma * inverse_dist, 12.0) - pow(sigma * inverse_dist, 6.0);
 	}
 
 	return potential;
 }
 
-void SingularPointsFinder::CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges)
+void SingularPointsFinder::CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges, const Mesh& mesh)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = mesh.vertices;
 	m_vertex_charge_map.SetGraph(vertices_graph);
+	const double kProbeRadius = 1.53;
+	for (auto vertex_iter = vertices(vertices_graph).first, 
+		end_iter = vertices(vertices_graph).second; vertex_iter != end_iter; ++vertex_iter)
+	{
+		const Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Center(); 
+		const Point3d curr_norm = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Normal();
+		const cv::Point3d curr_force = CalculatePotential(curr_coord + curr_norm * kProbeRadius, charges);
+		m_vertex_charge_map[*vertex_iter] = curr_force.x * curr_norm.x + curr_force.y * curr_norm.y + curr_force.z * curr_norm.z;
+	}
+}
+
+void SingularPointsFinder::CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const Mesh& mesh)
+{
+	const VerticesGraph& vertices_graph = mesh.vertices;
+	m_vertex_lennard_jones_map.SetGraph(vertices_graph);
+	const double kProbeRadius = 1.53;
 
 	for (auto vertex_iter = vertices(vertices_graph).first, 
 		end_iter = vertices(vertices_graph).second; vertex_iter != end_iter; ++vertex_iter)
 	{
-		const Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Center();
-		m_vertex_charge_map[*vertex_iter] = CalculatePotential(curr_coord, charges);
+		const Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Center(); 
+		const Point3d curr_norm = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Normal();
+		const cv::Point3d curr_force = CalculateLennardJonesPotential(curr_coord + curr_norm * kProbeRadius, wdv_radii, kProbeRadius);
+		m_vertex_lennard_jones_map[*vertex_iter] = curr_force.x * curr_norm.x + curr_force.y * curr_norm.y + curr_force.z * curr_norm.z;
 	}
 }
 
 void SingularPointsFinder::Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
-	const std::vector<cv::Point3i>& triangles, const std::vector<std::pair<cv::Point3d, double>>& charges)
+	const std::vector<cv::Point3i>& triangles, const std::vector<std::pair<cv::Point3d, double>>& charges, 
+	const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
+	const bool calc_prop_as_average)
 {
 	m_mesh_keeper.ConstructMesh(vertices, normals, triangles);
-	CalculateVerticesSurfaceType();
+	FilterMesh(m_mesh_keeper.GetMesh(), GaussianKernel<cv::Point3d, cv::Point3d>(1.0), m_filtered_mesh);
+	const Mesh& mesh_to_use = /*m_mesh_keeper.GetMesh();*/GetMesh();
+	CalculateVerticesSurfaceType(mesh_to_use);
 	const int kMaxSegmSize = 500;
-	SegmentMolecularSurface(kMaxSegmSize);
-	FindSegmentsGraphAndCenters();
-	CalculateAllPotentials(charges);
-	CalculateSingularPointsTypes();
+	SegmentMolecularSurface(kMaxSegmSize, mesh_to_use);
+	FindSegmentsGraphAndCenters(mesh_to_use);
+	CalculateAllPotentials(charges, m_mesh_keeper.GetMesh()/*mesh_to_use*/);
+	CalculateLennardJonesPotentials(wdv_radii, m_mesh_keeper.GetMesh()/*mesh_to_use*/);
 	CalculateSingularPointsHistograms();
+	CalculatePropsInSingPts(calc_prop_as_average);
+}
+
+void SingularPointsFinder::CalculatePropsInSingPts(const bool calc_prop_as_average)
+{
+	CalcPropInSingPts(m_vertex_charge_map, calc_prop_as_average, m_sing_pts_potential);
+	CalcPropInSingPts(m_vertex_lennard_jones_map, calc_prop_as_average, m_sing_pts_lennard_jones);
+}
+
+template<typename GraphPropMap>
+void SingularPointsFinder::CalcPropInSingPts(const GraphPropMap& graph_prop_map, const bool calc_prop_as_average, SingPtsDoublePropMap& sing_pts_prop_map)
+{
+	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMesh().vertices;
+	sing_pts_prop_map.SetGraph(m_singular_points_graph);
+
+	if (calc_prop_as_average)
+	{
+		std::vector<std::pair<double, bool>> average_prop;
+		CalculateAverageProp(vertices_graph, m_vertex_segm, graph_prop_map, average_prop);
+
+		for (auto vert_iter = vertices(m_singular_points_graph).first, 
+			end_vert = vertices(m_singular_points_graph).second; vert_iter != end_vert; ++vert_iter)
+		{
+			const VertexDescriptor curr_vert = get(boost::vertex_parent, m_singular_points_graph, *vert_iter);
+			const size_t curr_segm = m_vertex_segm[curr_vert];
+			CV_Assert(average_prop[curr_segm].second);
+			sing_pts_prop_map[*vert_iter] = average_prop[curr_segm].first;
+		}
+	}
+	else
+	{
+		for (auto vert_iter = vertices(m_singular_points_graph).first, 
+			end_vert = vertices(m_singular_points_graph).second; vert_iter != end_vert; ++vert_iter)
+		{
+			const VertexDescriptor curr_vert = get(boost::vertex_parent, m_singular_points_graph, *vert_iter);
+			sing_pts_prop_map[*vert_iter] = graph_prop_map[curr_vert];
+		}
+	}
 }
 
 const size_t kElectricSignMax = 2;
 const size_t kSurfaceTypeMax = kSaddleType;
 
-size_t SingularPointsFinder::GetTypesNum()
-{
-	return (kElectricSignMax + 1) * kSurfaceTypeMax;
-}
-
 void SingularPointsFinder::GetMarkedSingularPoints(std::vector<MarkedSingularPoint>& marked_singular_points)
 {
 	marked_singular_points.clear();
 	marked_singular_points.reserve(m_singular_points.size());
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMesh().vertices;
 
-	for (size_t ind = 0; ind < m_singular_points.size(); ++ind)
+	/*std::vector<VertexDescriptor> centers;
+	FindLocalMaximums(vertices_graph, m_curvature_1, centers);
+
+	for (size_t ind = 0; ind < centers.size(); ++ind)
+	{
+		const auto curr_vertice = centers[ind];
+		const size_t curr_type = 1;
+		const cv::Point3d& curr_coord = get(boost::vertex_info_3d, vertices_graph, curr_vertice).Center();
+		marked_singular_points.emplace_back(curr_coord, curr_type);
+	}*/
+
+	/*for (size_t ind = 0; ind < m_singular_points.size(); ++ind)
 	{
 		const auto curr_vertice = m_singular_points[ind];
 		const size_t curr_type = m_vertices_type_map[curr_vertice];
 		const cv::Point3d& curr_coord = get(boost::vertex_info_3d, vertices_graph, curr_vertice).Center();
 		marked_singular_points.emplace_back(curr_coord, curr_type);
-	}
+	}*/
 }
 
-void SingularPointsFinder::GetNonMarkedSingularPoints(std::vector<NonMarkedSingularPoint>& non_marked_singular_points)
+void SingularPointsFinder::GetNonMarkedSingularPoints(std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>>& non_marked_singular_points)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
-	non_marked_singular_points.resize(m_singular_points.size());
+	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMesh().vertices;
+	const size_t sing_pts_num = num_vertices(m_singular_points_graph);
+	non_marked_singular_points.first.resize(sing_pts_num);
+	non_marked_singular_points.second.resize(sing_pts_num);
 
-	for (size_t ind = 0; ind < m_singular_points.size(); ++ind)
+	for (auto vert_iter = vertices(m_singular_points_graph).first, 
+		end_vert = vertices(m_singular_points_graph).second; vert_iter != end_vert; ++vert_iter)
 	{
-		auto& curr_point = non_marked_singular_points[ind];
-		const auto curr_vertice = m_singular_points[ind];
-		curr_point.Property().SurfaceType() = m_vertex_curv_type[curr_vertice];
-		curr_point.Property().Charge() = Sign(m_vertex_charge_map[curr_vertice]);
-		curr_point.Property().ElectricPotential() = m_vertex_charge_map[curr_vertice];
-		curr_point.Coord() = get(boost::vertex_info_3d, vertices_graph, curr_vertice).Center();
+		const int ind = get(boost::vertex_index, m_singular_points_graph, *vert_iter);
+		auto& curr_point = non_marked_singular_points.first[ind];
+		
+		const auto curr_graph_vertice =  get(boost::vertex_parent, m_singular_points_graph, *vert_iter);
+		curr_point.Property().SurfaceType() = m_vertex_curv_type[curr_graph_vertice];
+		curr_point.Property().Charge() = Sign(m_sing_pts_potential[*vert_iter]);
+		curr_point.Property().ElectricPotential() = m_sing_pts_potential[*vert_iter];
+		curr_point.Property().LennardJones() = m_sing_pts_lennard_jones[*vert_iter];
+		curr_point.Coord() = get(boost::vertex_info_3d, vertices_graph, curr_graph_vertice).Center();
+		//non_marked_singular_points.second[ind] = m_vertices_type_map[curr_vertice];
 	}
 }
 
 void SingularPointsFinder::GetSingularPointsHisto(std::vector<HistogramSingularPoint<kHistSize>>& singular_points_hist)
 {
 	singular_points_hist.resize(num_vertices(m_singular_points_graph));
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMesh().vertices;
 	const auto coord_map = get(boost::vertex_info_3d, vertices_graph);
 	int ind = 0;
 	for (auto curr_center = vertices(m_singular_points_graph).first, end_centers = vertices(m_singular_points_graph).second; 
@@ -117,22 +209,24 @@ void SingularPointsFinder::GetSingularPointsHisto(std::vector<HistogramSingularP
 
 void SingularPointsFinder::GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = GetMesh().vertices;
 	vertices_with_segm_numbers.clear();
 	vertices_with_segm_numbers.reserve(num_vertices(vertices_graph));
-
+	const auto map_3d = get(boost::vertex_info_3d, vertices_graph);
+	
 	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 		curr_vertice != end_vertices; ++curr_vertice)
 	{
 		const size_t curr_segm = m_vertex_segm[*curr_vertice];
-		const cv::Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *curr_vertice).Center();
+		//const size_t curr_segm = 10.0 * (std::min(1.0, std::max(-1.0, abs(m_curvature_0[*curr_vertice]))) /* + 1.0*/ ); 
+		const cv::Point3d curr_coord = map_3d[*curr_vertice].Center();
 		vertices_with_segm_numbers.push_back(std::make_pair(curr_coord, curr_segm));
 	}
 }
 
 void SingularPointsFinder::GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = GetMesh().vertices;
 	vertices_with_types.clear();
 	vertices_with_types.reserve(num_vertices(vertices_graph));
 
@@ -151,7 +245,7 @@ void SingularPointsFinder::Clear()
 	m_singular_points_graph = SingularPointsGraph();
 	m_sing_pts_histo.Clear();
 
-	m_vertices_type_map.Clear();
+	//m_vertices_type_map.Clear();
 	m_vertex_charge_map.Clear();
 	m_vertex_curv_type.Clear();
 	m_vertex_segm.Clear();
@@ -159,24 +253,51 @@ void SingularPointsFinder::Clear()
 	m_triangles_segm.Clear();
 }
 
-void SingularPointsFinder::CalculateVerticesSurfaceType()
+void SingularPointsFinder::CalculateVerticesSurfaceType(const Mesh& mesh)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = mesh.vertices;
 	m_vertex_curv_type.SetGraph(vertices_graph);
+	
+	//calculate curvature
+	m_curvature_1.SetGraph(vertices_graph);
+	m_curvature_0.SetGraph(vertices_graph);
 	const int kMaxNeighbNum = 10;
 	CurvatureCalculator<VerticesGraph> curvature_calculator(kMaxNeighbNum);
-	
+
 	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 		curr_vertice != end_vertices; ++curr_vertice)
 	{
 		Vec2d curvatures;
-		curvature_calculator.CalculateCurvatureCubic(vertices_graph, *curr_vertice, curvatures);
-		
-		if (curvatures[1] > 0.0)
+		curvature_calculator.CalculateCurvatureCubic(vertices_graph, get(boost::vertex_info_3d, vertices_graph), *curr_vertice, curvatures);
+		m_curvature_1[*curr_vertice] = curvatures[1];
+		m_curvature_0[*curr_vertice] = curvatures[0];
+	}
+
+	//filter curvature
+	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_1(vertices_graph);
+	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_0(vertices_graph);
+	typedef MedianKernel<double, size_t> KernelType;
+	const size_t kMedRad = 1;
+	FilterGraphEdgeDist(KernelType(kMedRad), vertices_graph, m_curvature_1, filtered_curvature_1);
+	FilterGraphEdgeDist(KernelType(kMedRad), vertices_graph, m_curvature_0, filtered_curvature_0);
+	//m_curvature_1 = filtered_curvature_1;
+	//m_curvature_0 = filtered_curvature_0;
+	/*typedef GaussianKernel<cv::Point3d, double> KernelType; 
+
+	GraphDistFilter<VerticesGraph, ProxyCoordMapGraph, GaussianKernel<cv::Point3d, double>> gauss_filter_1(GaussianKernel<cv::Point3d, double>(0.5));
+	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_1(vertices_graph);
+	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_0(vertices_graph);
+	gauss_filter_1.Filter(vertices_graph, map_3d_coord, curvature_1, filtered_curvature_1);
+	gauss_filter_1.Filter(vertices_graph, map_3d_coord, curvature_0, filtered_curvature_0);*/
+
+	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+		curr_vertice != end_vertices; ++curr_vertice)
+	{
+		if (/*filtered_*/m_curvature_1[*curr_vertice] > 0.0)
 		{
 			m_vertex_curv_type[*curr_vertice] = kConcaveType;
 		}
-		else if (curvatures[0] < 0.0)
+		else if (/*filtered_*/m_curvature_0[*curr_vertice] < 0.0)
 		{
 			m_vertex_curv_type[*curr_vertice] = kSaddleType;
 		}
@@ -186,33 +307,8 @@ void SingularPointsFinder::CalculateVerticesSurfaceType()
 		}
 	}
 
-	//filter surface types labels
-	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
-		curr_vertice != end_vertices; ++curr_vertice)
-	{
-		const size_t curr_type = m_vertex_curv_type[*curr_vertice];
-		size_t differences_num = 0;
-
-		for (auto curr_neighbour = adjacent_vertices(*curr_vertice, vertices_graph).first,
-			end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second;
-			curr_neighbour != end_neighb; ++curr_neighbour)
-		{
-			const size_t neighb_type = m_vertex_curv_type[*curr_neighbour];
-			if (neighb_type != curr_type)
-			{
-				differences_num++;
-			}
-		}
-
-		if (differences_num == in_degree(*curr_vertice, vertices_graph))
-		{
-			auto first_neighbour = adjacent_vertices(*curr_vertice, vertices_graph).first;
-			m_vertex_curv_type[*curr_vertice] = m_vertex_curv_type[*first_neighbour];
-		}
-	}
-
 	//assign triangles labels
-	const TrianglesGraph& triangles_graph = m_mesh_keeper.GetMeshTriangles();
+	const TrianglesGraph& triangles_graph = mesh.triangles;
 	m_triangle_curv_type.SetGraph(triangles_graph);
 
 	for (auto curr_tr_iter = vertices(triangles_graph).first, last_tr = vertices(triangles_graph).second; 
@@ -247,10 +343,34 @@ void SingularPointsFinder::CalculateVerticesSurfaceType()
 
 const size_t kMinElementsInSegm = 5;
 
-void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
+template <typename Iter>
+void CalcMeanAndDev(const Iter it_beg, const Iter it_end, double& mean, double& dev)
+{
+	mean = 0;
+	int length = 0;
+	for (Iter iter = it_beg; iter != it_end; ++iter)
+	{
+		mean += *iter;
+		++length;
+	}
+
+	if (length == 0)
+	{
+		return;
+	}
+	mean /= static_cast<double>(length);
+
+	dev = 0;
+	for (Iter iter = it_beg; iter != it_end; ++iter)
+	{
+		dev += abs(*iter - mean);
+	}
+	dev /= static_cast<double>(length);
+}
+void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size, const Mesh& mesh)
 {	
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
-	const TrianglesGraph& triangles_graph = m_mesh_keeper.GetMeshTriangles();
+	const VerticesGraph& vertices_graph = mesh.vertices;
+	const TrianglesGraph& triangles_graph = mesh.triangles;
 	m_triangles_segm.SetGraph(triangles_graph);
 	m_vertex_segm.SetGraph(vertices_graph);
 
@@ -266,6 +386,11 @@ void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
 		const unsigned char curr_type = types[type_ind];
 		size_t curr_segm_num = 0;
 		conn_comp_segmentator.SegmentImageValue(triangles_graph, m_triangle_curv_type, curr_type, kMinElementsInSegm, curr_temp_segm, curr_segm_num);
+
+		if (curr_segm_num == 0)
+		{
+			continue;
+		}
 		//remap segments number and write to common segments map
 		vector<size_t> segments_sizes(curr_segm_num + 1, 0);
 		for (auto tr_iter = vertices(triangles_graph).first, last_tr = vertices(triangles_graph).second; 
@@ -278,15 +403,23 @@ void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
 				segments_sizes[curr_segm]++;
 			}
 		}
+
 		//split too big segments
+		//find sizes deviation
+		double mean_elems_in_segm = 0, dev = 0;
+		const std::vector<size_t>::iterator beg_next = segments_sizes.begin() + 1, size_end = segments_sizes.end();
+		CalcMeanAndDev(beg_next, size_end, mean_elems_in_segm, dev);
+		//split big segments
+		const double diff_thresh = 1.75 * dev;
+		//const int max_segm_size = static_cast<int>(std::min(2.0 * mean_elems_in_segm, mean_elems_in_segm + 1.75 * dev));
+
 		const size_t segm_num_before_split = curr_segm_num;
 		curr_segm_num += all_segm_num;
-
 		for (size_t curr_segm = 1; curr_segm <= segm_num_before_split; ++curr_segm)
 		{
 			if (segments_sizes[curr_segm] > max_segm_size)
 			{
-				const size_t parts_of_segm_num = static_cast<int>(ceil(segments_sizes[curr_segm] / static_cast<double>(max_segm_size)));
+				const size_t parts_of_segm_num = static_cast<int>(ceil(segments_sizes[curr_segm] / static_cast<double>(mean_elems_in_segm)));
 				SplitSegment(triangles_graph, curr_segm + all_segm_num, parts_of_segm_num, m_triangles_segm, curr_segm_num);
 			}
 		}
@@ -294,19 +427,34 @@ void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
 		all_segm_num = curr_segm_num;
 	}
 
-	//write segments_num to vertices
 	all_segm_num++;
+	//segment saddle vertices with k-means
+	int segmented_triangles_num = 0;
+	const int saddle_type_ini_segm_num = all_segm_num;
+	for (auto tr_iter = vertices(triangles_graph).first, end_iter = vertices(triangles_graph).second; 
+		tr_iter != end_iter; ++tr_iter)
+	{		
+		if (m_triangle_curv_type[*tr_iter] == kSaddleType)
+		{
+			m_triangles_segm[*tr_iter] = saddle_type_ini_segm_num;//mark for segmenting with k-means
+		}
+		else
+		{
+			++segmented_triangles_num;
+		}
+	}
+	//calculate segments num for saddle regions
+	const int non_segmented_triangles = num_vertices(triangles_graph) - segmented_triangles_num;
+	const size_t parts_num = std::max(Round(all_segm_num * static_cast<double>(non_segmented_triangles) / segmented_triangles_num), 1);
+	const size_t segm_num_to_split = saddle_type_ini_segm_num;
+	SplitSegment(triangles_graph, segm_num_to_split, parts_num, m_triangles_segm, all_segm_num);
+	std::cout << all_segm_num << "\n";
+	//write segments_num to vertices
 	m_vertex_score_map.SetGraph(vertices_graph);
 	for (auto tr_iter = vertices(triangles_graph).first, end_iter = vertices(triangles_graph).second; 
 		tr_iter != end_iter; ++tr_iter)
 	{
-		
-		if (m_triangle_curv_type[*tr_iter] == kSaddleType)
-		{
-			m_triangles_segm[*tr_iter] = all_segm_num;//mark for segmenting with k-means
-		}
-
-		const MeshTriangle curr_triangle = get(boost::vertex_info_3d, triangles_graph, *tr_iter);
+		const MeshTriangle& curr_triangle = get(boost::vertex_info_3d, triangles_graph, *tr_iter);
 		const size_t curr_segm = m_triangles_segm[*tr_iter];
 		m_vertex_score_map[curr_triangle.a][curr_segm]++;
 		m_vertex_score_map[curr_triangle.b][curr_segm]++;
@@ -333,81 +481,25 @@ void SingularPointsFinder::SegmentMolecularSurface(const size_t max_segm_size)
 	}
 	//segment remaining vertices
 	
-	const size_t segm_num_to_split = all_segm_num;
+	/*const size_t segm_num_to_split = all_segm_num;
 	const size_t parts_num = all_segm_num / 2 + 1;
-	SplitSegment(vertices_graph, segm_num_to_split, parts_num, m_vertex_segm, all_segm_num);
+	SplitSegment(vertices_graph, segm_num_to_split, parts_num, m_vertex_segm, all_segm_num);*/
 }
 
-void SingularPointsFinder::FindSegmentsGraphAndCenters()
+void SingularPointsFinder::FindSegmentsGraphAndCenters(const Mesh& mesh)
 {
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
+	const VerticesGraph& vertices_graph = mesh.vertices;
 	CalculateSegmentGraphAndCenters(vertices_graph, m_vertex_segm, m_singular_points, m_singular_points_graph);
 }
 
-struct TypeWithMax
-{
-	size_t type;
-	IntRange range;
 
-	int Order() const
-	{
-		return (type - range.min_val) / range.step;
-	}
-};
-
-size_t CalculateSingularPointType(const std::vector<TypeWithMax>& type_with_max)
-{
-	size_t type = 0;
-
-	for (size_t curr_type = 0; curr_type < type_with_max.size(); ++curr_type)
-	{
-		if (curr_type > 0)
-		{
-			type *= type_with_max[curr_type - 1].range.ElemsInRange();
-		}
-
-		type += type_with_max[curr_type].Order();
-	}
-
-	return type;
-}
-
-void SingularPointsFinder::CalculateSingularPointsTypes()
-{
-	IntRange curvature_range;
-	curvature_range.min_val = kConvexType;
-	curvature_range.max_val = kSaddleType;
-	curvature_range.step = 1;
-
-	IntRange charge_range;
-	charge_range.min_val = -1;
-	charge_range.max_val = 1;
-	charge_range.step = 1; 
-
-	std::vector<TypeWithMax> type_with_max(2);
-	enum {SIGN, CURVATURE};
-	type_with_max[SIGN].range = charge_range;
-	type_with_max[CURVATURE].range = curvature_range;
-	
-	const VerticesGraph& vertices_graph = m_mesh_keeper.GetMeshVertices();
-	m_vertices_type_map.SetGraph(vertices_graph);
-	for (auto iter = vertices(vertices_graph).first, 
-		end = vertices(vertices_graph).second; iter != end; ++iter)
-	{
-		const size_t curr_sign = Sign(m_vertex_charge_map[*iter]);
-		type_with_max[SIGN].type = curr_sign;
-		type_with_max[CURVATURE].type = m_vertex_curv_type[*iter];
-		const size_t curr_type = CalculateSingularPointType(type_with_max);
-		m_vertices_type_map[*iter] = curr_type;
-	}
-}
 
 void SingularPointsFinder::CalculateSingularPointsHistograms()
 {
 	m_sing_pts_histo.SetGraph(m_singular_points_graph);
-	CV_Assert(kHistSize == GetTypesNum());
+	//CV_Assert(kHistSize == GetTypesNum());
 
-	for (auto node_iter = vertices(m_singular_points_graph).first, end_iter = vertices(m_singular_points_graph).second; 
+	/*for (auto node_iter = vertices(m_singular_points_graph).first, end_iter = vertices(m_singular_points_graph).second; 
 		node_iter != end_iter; ++node_iter)
 	{
 		std::array<uint8_t, kHistSize>& curr_hist = m_sing_pts_histo[*node_iter];
@@ -422,7 +514,7 @@ void SingularPointsFinder::CalculateSingularPointsHistograms()
 			const size_t neighb_type = m_vertices_type_map[get(boost::vertex_parent, m_singular_points_graph, *neighb_iter)];
 			++curr_hist[neighb_type];
 		}
-	}
+	}*/
 }
 
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 #include <math.h>
 #include <array>
 #include <shark/Core/IParameterizable.h>
@@ -15,12 +16,16 @@ class GaussianKernelOneDim /*: public shark::IParameterizable*/
 public:
 	typedef double elem_type;
 
+	GaussianKernelOneDim(const std::vector<double>& sigma)
+		: m_param_vect(1), m_thresholds(sigma)
+	{
+		//SetSigma(sigma);
+	}
 	GaussianKernelOneDim(const double sigma)
-		: m_param_vect(1)
+		: m_param_vect(1), m_sigma(sigma)
 	{
 		SetSigma(sigma);
 	}
-
 	GaussianKernelOneDim()
 		: m_param_vect(1)
 	{
@@ -29,9 +34,26 @@ public:
 
 	inline double operator()(double x, double y)
 	{
+	/*	size_t type_1 = 0;
+		for (; type_1 < m_thresholds.size(); ++type_1)
+		{
+			if (x < m_thresholds[type_1])
+			{
+				break;
+			}
+		}
+		size_t type_2 = 0;
+		for (; type_2 < m_thresholds.size(); ++type_2)
+		{
+			if (y < m_thresholds[type_2])
+			{
+				break;
+			}
+		}
+		return type_1 == type_2;*/
 		const double abs_arg = abs(x - y);
 
-		if (abs_arg > m_threshold)
+		if (abs_arg > /*m_sigma*/m_threshold)
 		{
 			return 0.0;
 		}
@@ -69,6 +91,7 @@ private:
 	double m_threshold;
 	double m_precalculated_multiplyer;
 	shark::RealVector m_param_vect;
+	std::vector<double> m_thresholds;
 };
 
 class MultiplicativeGaussianKernel
@@ -103,12 +126,26 @@ class TriangleKernel
 {
 public:
 	typedef double elem_type;
+	TriangleKernel()
+		: m_C(0)
+	{
 
-	TriangleKernel(const double C)
+	}
+	explicit TriangleKernel(const double C)
 		: m_C(C) {}
+	/*virtual*/ shark::RealVector 	parameterVector () const {
+		return shark::RealVector();
+	}
+
+	/*virtual*/ void setParameterVector (shark::RealVector const& new_parameters) {
+	}
+
+	/*virtual*/ std::size_t 	numberOfParameters () const	{
+		return 0;
+	}
 	inline double operator()(double x, double y)
 	{
-		return std::max(0.0, (m_C - abs(x - y)) / m_C);
+		return /*exp(-(x-y) * (x - y) / (2.0 * m_C * m_C));*/std::max(0.0, (m_C - abs(x - y)) / m_C);
 	}
 private:
 	double m_C;

@@ -13,23 +13,28 @@ namespace molecule_descriptor
 {
 using namespace std;
 using namespace cv;
+
+template <typename OutT>
+struct CommonDistFunc
+{
+	template <typename T>
+	inline OutT operator()(const T& elem1, const T& elem2)
+	{
+		return abs(elem1 - elem2);
+	}
+};
 /** 
 * Class for connected components segmentation of labeled graph
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
+template <class GraphType, typename PropertyMap, 
+	typename SegmentsMap, typename DistType = int, typename DistanceFunction = CommonDistFunc<DistType>>
 class ConnectedComponentsSegmentator
 {
 public:
-	typedef typename std::remove_const<
-		typename std::remove_reference<
-		decltype(PropertyMap()[0])>::type
-		>::type PropType;
-	typedef typename std::remove_const<
-		typename std::remove_reference<
-		decltype(SegmentsMap()[0])>::type
-	>::type SegmType;
+	typedef typename boost::property_traits<PropertyMap>::value_type PropType;
+	typedef typename boost::property_traits<SegmentsMap>::value_type SegmType;
 	typedef typename boost::graph_traits<GraphType>::vertex_descriptor VertexType;
-	ConnectedComponentsSegmentator() : m_segments_num(0){ };
+	ConnectedComponentsSegmentator(DistanceFunction dist_func = DistanceFunction()) : m_segments_num(0), m_dist_func(dist_func){ };
 	/** \brief Segment connected regions of predefined value*/ 	
 	void SegmentImageValue(const GraphType& graph, const PropertyMap& prop_map, const PropType value,	
 		const size_t size_thresh, SegmentsMap& segm_map, size_t& segments_num);
@@ -38,7 +43,7 @@ public:
 		const size_t size_thresh, SegmentsMap& segm_map, size_t& segments_num);
 	/** \brief Segment regions around seeds which value differ from seed value less than threshold*/ 
 	void SegmentImageSeeds(const GraphType& graph, const PropertyMap& prop_map, const size_t size_thresh, 
-		const vector<VertexType>& seeds, const PropType color_thresh, SegmentsMap& segm_map, size_t& segments_num);
+		const vector<VertexType>& seeds, const DistType color_thresh, SegmentsMap& segm_map, size_t& segments_num);
 	/** \brief Delete connected segments which size is less than threshold in binary image*/
 	void DeleteSmallSegments(const GraphType& graph, const PropType val, const PropType value, 
 		const PropType null_val, const size_t size_thresh, PropertyMap& prop_map);
@@ -49,12 +54,12 @@ private:
 	enum eSegmentValues { ONE_VALUE, ALL_VALUES };
 	/** \brief Implementation of segmentation*/ 	
 	void SegmentImageImpl(const GraphType& graph, const PropertyMap& prop_map, eSegmentValues use_value,
-		const PropType value, const size_t size_thresh, const PropType color_thresh, 
+		const PropType value, const size_t size_thresh, const DistType color_thresh, 
 		const vector<VertexType>& seeds, SegmentsMap& segm_map, size_t& labels_num);
 	/** \brief Implementation of one segment distinguishing*/ 	
-	void PickOutOneSegment(const VertexType seed, const PropType value, const PropType color_thresh);
+	void PickOutOneSegment(const VertexType seed, const PropType value, const DistType color_thresh);
 	/** \brief Grows region. This function is used in segmentation*/
-	void GrowRegion(const VertexType curr_node,	const PropType value, const PropType color_thresh, 
+	void GrowRegion(const VertexType curr_node,	const PropType value, const DistType color_thresh, 
 		const SegmType curr_segm);
 	/** \brief Deletes region.*/
 	void DeleteRegion(const VertexType curr_node, const SegmType curr_segm);
@@ -70,6 +75,7 @@ private:
 												 When it becomes empty we treat current region as processed*/
 	size_t	m_size_thresh;						/**< minimum segment size for the current segmentation*/
 	ContPropMap<GraphType, std::vector<size_t>, VERTEX> m_internal_segm_map;
+	DistanceFunction m_dist_func;
 };
 
 /**
@@ -82,8 +88,8 @@ private:
 * \param [out]		segments_num			number of segments
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::SegmentImageValue(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::SegmentImageValue(
 	const GraphType& graph, const PropertyMap& prop_map, const PropType value,	
 	const size_t size_thresh, SegmentsMap& segm_map, size_t& segments_num)
 {
@@ -105,8 +111,8 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Segmen
 * \param [out]		segments_num			number of segments
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::SegmentImage(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::SegmentImage(
 	const GraphType& graph, const PropertyMap& prop_map, 	
 	const size_t size_thresh, SegmentsMap& segm_map, size_t& segments_num)
 {	
@@ -131,13 +137,13 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Segmen
 * \param [out]		segments_num			number of segments
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::SegmentImageSeeds(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::SegmentImageSeeds(
 	const GraphType& graph, const PropertyMap& prop_map, const size_t size_thresh, 
-	const vector<VertexType>& seeds, const PropType color_thresh, SegmentsMap& segm_map, size_t& segments_num)
+	const vector<VertexType>& seeds, const DistType color_thresh, SegmentsMap& segm_map, size_t& segments_num)
 {
-	const PropType value = 0;
-	SegmentImageImpl(graph, ALL_VALUES, value, size_thresh, color_thresh, seeds, segments_num);
+	const PropType value = PropType();
+	SegmentImageImpl(graph, prop_map, ALL_VALUES, value, size_thresh, color_thresh, seeds,segm_map, segments_num);
 }
 
 /**
@@ -147,8 +153,8 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Segmen
 * \param [in]		size_thresh				if size of the region is less then threshold we delete it
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::DeleteSmallSegments(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::DeleteSmallSegments(
 	const GraphType& graph, const PropType value, const PropType val, 
 	const PropType null_val, const size_t size_thresh, PropertyMap& prop_map)
 {
@@ -179,10 +185,10 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Delete
 * \param [out]		segments_num			number of segments
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::SegmentImageImpl(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::SegmentImageImpl(
 	const GraphType& graph, const PropertyMap& prop_map, eSegmentValues use_value,
-	const PropType value, const size_t size_thresh, const PropType color_thresh, 
+	const PropType value, const size_t size_thresh, const DistType color_thresh, 
 	const vector<VertexType>& seeds, SegmentsMap& segm_map, size_t& labels_num)
 {
 	m_size_thresh = size_thresh;
@@ -194,7 +200,6 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Segmen
 
 	//segments numbers are going from 1, not from 0
 	//segmentation process
-	typedef typename boost::graph_traits<GraphType>::vertex_iterator;
 	for (auto curr_vertex = vertices(*m_curr_graph).first, end_vertex = vertices(*m_curr_graph).second; 
 		curr_vertex != end_vertex; ++curr_vertex)
 	{//mark all nodes as non-visited
@@ -226,9 +231,9 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::Segmen
 * \param [in]		color_thresh			threshold for color difference between seed pixel and current pixel
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::PickOutOneSegment(
-	const VertexType seed, const PropType value, const PropType color_thresh)
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::PickOutOneSegment(
+	const VertexType seed, const PropType value, const DistType color_thresh)
 {
 	if (m_visited_map[seed] == true)
 	{
@@ -270,9 +275,9 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::PickOu
 * \param [in]       curr_pix				current pixel coordinates
 **************************************************************************
 */
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::GrowRegion(	
-	const VertexType curr_node,	const PropType value, const PropType color_thresh, const SegmType curr_segm)
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap, DistType, DistanceFunction>::GrowRegion(	
+	const VertexType curr_node,	const PropType value, const DistType color_thresh, const SegmType curr_segm)
 {
 	//process current pixel
 	(*m_segm_map)[curr_node] = m_segments_num;
@@ -284,7 +289,7 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::GrowRe
 		neighb_it != end_neighb; ++neighb_it)
 	{	
 		if (
-			abs(static_cast<double>((*m_prop_map)[*neighb_it] - value)) > static_cast<double>(color_thresh) 
+			m_dist_func((*m_prop_map)[*neighb_it], value) > static_cast<double>(color_thresh) 
 			|| m_visited_map[*neighb_it] == true)
 		{
 			continue;
@@ -296,8 +301,8 @@ void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::GrowRe
 	}	
 }
 
-template <class GraphType, typename PropertyMap, typename SegmentsMap>
-void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap>::DeleteRegion(
+template <class GraphType, typename PropertyMap, typename SegmentsMap, typename DistType, typename DistanceFunction>
+void ConnectedComponentsSegmentator<GraphType, PropertyMap, SegmentsMap,DistType, DistanceFunction>::DeleteRegion(
 	const VertexType curr_node, const SegmType curr_segm)
 {
 	//process current pixel

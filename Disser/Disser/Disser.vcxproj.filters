@@ -67,9 +67,6 @@
     <ClInclude Include="SingularPoints\mesh_types.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
-    <ClInclude Include="SingularPoints\singular_point_types.h">
-      <Filter>SingularPoints</Filter>
-    </ClInclude>
     <ClInclude Include="SingularPoints\singular_points_finder.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
@@ -78,6 +75,21 @@
     </ClInclude>
     <ClInclude Include="GraphLib\dijkstra_dist_matr.h">
       <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\graph_filter.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\proxy_property_map.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\mesh_operations.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\graph_functions.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="Manager\types_calculation.h">
+      <Filter>Manager</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

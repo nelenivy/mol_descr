@@ -1,20 +1,10 @@
+#include "stdafx.h"
 #include "mgua.h"
 
 namespace molecule_descriptor
 {
 
-void MGUATrainer::SetParameters(size_t max_iterations, size_t descr_to_select_num)
-{
-	m_max_iterations = max_iterations;
-	m_descr_to_select_num = descr_to_select_num;
 
-	//change descriptors set containers
-	m_base_descr_set.resize(m_descr_to_select_num);
-	m_curr_best_set.resize(m_descr_to_select_num);
-
-	std::fill(m_base_descr_set.begin(), m_base_descr_set.end(), DescriptorsSetWithError(m_max_iterations, kBigError));
-	std::fill(m_curr_best_set.begin(), m_curr_best_set.end(), DescriptorsSetWithError(m_max_iterations, kBigError));
-}
 
 void WriteSetToFile(const std::vector<DescriptorsSetWithError>& base_descr_set, const std::string& file_name)
 {
@@ -31,7 +21,10 @@ void WriteSetToFile(const std::vector<DescriptorsSetWithError>& base_descr_set, 
 			f << curr_descr_set[descr_pos] << " ";
 		}
 
-		f << "err = " << base_descr_set[ind].error;
+		f << "precision = " << base_descr_set[ind].precision;
+		f << " recall = " << base_descr_set[ind].recall;
+		f << " f_measure = " << base_descr_set[ind].FMeasure();
+		f << "\n";
 	}
 }
 }

@@ -86,6 +86,18 @@ public:
 	{
 		SetGraph(g);
 	}	
+
+	ContPropMap(const ContPropMap& prop_map)
+	{
+		operator=(prop_map);
+	}
+	ContPropMap& operator=(const ContPropMap& prop_map)
+	{
+		m_container = prop_map.m_container;
+		const IndexMapType index_map = prop_map.index;
+		(static_cast<Base*>(this))->operator=(Base(m_container.begin(), index_map));
+		return *this;
+	}
 	void SetGraph(const Graph& g)
 	{
 		if (kVertOrEdge == VERTEX)

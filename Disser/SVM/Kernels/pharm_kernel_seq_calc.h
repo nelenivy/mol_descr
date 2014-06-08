@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 #include <utility>
 #include <string>
 #include <vector>
@@ -26,6 +27,9 @@ class PharmSequenceKernel : public shark::AbstractKernelFunction<
 						> >
 {
 public:
+	typedef ElemWithIndexAndID<//it's to not calculate gramm matrix each time
+		std::vector<SingularPoint<PropType> > 
+	> value_type;
 	typedef std::vector<SingularPoint<PropType>> SingularPointsSequence;
 
 	PharmSequenceKernel()
@@ -56,12 +60,17 @@ public:
 			return;
 		}
 
-		shark::init(new_parameters) >> shark::parameters(m_dist_kernel), shark::parameters(m_props_kernel);
+		init(new_parameters) >> shark::blas::parameters(m_dist_kernel), shark::blas::parameters(m_props_kernel);
 		CalcParamsVector();
 		m_triples_mat_cache.Clear();
 		m_pairs_mat_cache.Clear();
 
-	}	 
+	}	
+	/*virtual void eval(BatchInputType const& batchX1, BatchInputType const& batchX2, shark::RealMatrix& result, shark::State& state) const
+	{
+		eval(batchX1, batchX2, result);
+	}*/
+		
 	/// return the number of hyper-parameters
 	virtual size_t numberOfParameters() const{ 
 		return m_params_vect.size();
@@ -70,7 +79,7 @@ protected:
 	void CalcParamsVector()
 	{
 		m_params_vect.resize(m_props_kernel.numberOfParameters() + m_dist_kernel.numberOfParameters());
-		shark::init(m_params_vect) << shark::parameters(m_dist_kernel), shark::parameters(m_props_kernel);
+		init(m_params_vect) << shark::blas::parameters(m_dist_kernel), shark::blas::parameters(m_props_kernel);
 	}
 	void EvalImplBatch(ConstBatchInputReference batchX1,	ConstBatchInputReference batchX2,
 		shark::RealMatrix& result,	shark::State& state, const bool process_pairs) const;
@@ -99,19 +108,19 @@ public:
 	{
 
 	}
-	virtual std::string name() 
+	virtual std::string name()  
 	{
 		return "PharmSequenceKernelPairs";
 	}
 
 	virtual void eval(ConstBatchInputReference batchX1,	ConstBatchInputReference batchX2,
-		shark::RealMatrix& result,	shark::State& state) const 
+		shark::RealMatrix& result,	shark::State& state) const  
 	{
 		const bool process_pairs = true;
 		EvalImplBatch(batchX1, batchX2, result, state, process_pairs);
 	}
 
-	virtual double eval(ConstInputReference batchX1,	ConstInputReference batchX2) const 
+	virtual double eval(ConstInputReference batchX1,	ConstInputReference batchX2) const  
 	{
 		const bool process_pairs = true;
 		return EvalImplSingle(batchX1, batchX2, process_pairs);
@@ -137,10 +146,16 @@ public:
 		return "PharmSequenceKernelTriples";
 	}
 
-	virtual double eval(ConstInputReference batchX1,	ConstInputReference batchX2) const 
+	virtual void eval(ConstBatchInputReference batchX1,	ConstBatchInputReference batchX2,
+		shark::RealMatrix& result,	shark::State& state) const  
 	{
 		const bool process_pairs = false;
-		return EvalImplSingle(batchX1, batchX2process_pairs);
+		EvalImplBatch(batchX1, batchX2, result, state, process_pairs);
+	}
+	virtual double eval(ConstInputReference batchX1,	ConstInputReference batchX2) const   
+	{
+		const bool process_pairs = false;
+		return EvalImplSingle(batchX1, batchX2, process_pairs);
 	}
 };
 

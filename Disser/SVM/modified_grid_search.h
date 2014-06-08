@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.h"
 #include <shark/Algorithms/DirectSearch/GridSearch.h>
 
 namespace molecule_descriptor
@@ -19,7 +20,7 @@ public:
 		m_out = &out;
 	}
 	void step(const ObjectiveFunctionType& objectiveFunction) {
-		size_t dimensions = m_nodeValues.size();
+		const size_t dimensions = m_nodeValues.size();
 		std::vector<size_t> index(dimensions, 0);
 		m_best.value = 1e100;
 		shark::RealVector point(dimensions);
@@ -48,17 +49,19 @@ public:
 				}
 			}
 
-			// next index
-			size_t dimension = dimensions - 1;
-			for (; dimension >= 0; dimension--)
-			{
-				index[dimension]++;
-				if (index[dimension] < m_nodeValues[dimension].size()) break;
-				index[dimension] = 0;
+			{// next index
+				int dimension = static_cast<int>(dimensions) - 1;
+				for (; dimension >= 0; dimension--)
+				{
+					index[dimension]++;
+					if (index[dimension] < m_nodeValues[dimension].size()) 
+						break;
+					index[dimension] = 0;
+				}
+				if (dimension == - 1) break;
 			}
-			if (dimension == - 1) break;
 
-			for (int dimension = dimensions - 1; dimension >= 0; dimension--)
+			for (int dimension = static_cast<int>(dimensions) - 1; dimension >= 0; dimension--)
 			{
 				std::cout << index[dimension] << " ";
 			}

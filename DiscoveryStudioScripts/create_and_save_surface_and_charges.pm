@@ -3,7 +3,7 @@
 use strict;
 use MdmDiscoveryScript;
 
-sub CreateAndSaveSurfaceAndCharges
+sub CreateAndSaveSurfaceChargesAndWDVRadii
 {
 #document - document which contains molecule
 	my ($document, $molecule, %settings) = @_;
@@ -31,6 +31,15 @@ sub CreateAndSaveSurfaceAndCharges
 	}
 	
 	close $charges_file;
+	#wdv radii
+	open(my $radii_file, '>', $output_folder.$prefix."_$curr_ind".'.wdv') ;
+
+	foreach my $atom (@$array_of_atoms)
+	{
+	    print $radii_file $atom->XYZ->X.' '.$atom->XYZ->Y.' '.$atom->XYZ->Z.' '.$atom->VdwRadius."\n";
+	}
+	
+	close $radii_file;
 	
 	$surface->SetInvisible();
 	$molecule->SetInvisible();

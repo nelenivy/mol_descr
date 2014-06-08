@@ -5,6 +5,7 @@
 #include "opencv2/core/core.hpp"
 #include "../Common/singular_point.h"
 #include "molecule_manager.h"
+#include "../../SVM/mgua.h"
 
 namespace molecule_descriptor
 {
@@ -19,14 +20,15 @@ public:
 	void ProcessPairs(const bool calculate);
 	void ProcessTriples(const bool calculate);
 	void ProcessKernelSVMPoints();
+	void ProcessKernelSVMPointsWithFiltering();
 	void ProcessKernelSVMHistograms();
 	void ProcessDescriptorsSVM();
-	void ProcessMGUASVM();
+	void ProcessMGUASVMClassification(const int iter_num, const int descr_num);
+	void ProcessMGUASVMRegression();
 private:
 	void ReadParamsFromCommandLine(int argc, char** argv);
 	void FindOutMoleculesNum();
 	void CalculateDistThresholdsKMeans();
-	void CalculateDistThresholdsQuantils();
 	std::string MakeMoleculePrefix(const int ind);
 private:
 	//params
@@ -42,6 +44,9 @@ private:
 	bool m_inited;
 	bool m_processed;
 	cv::Mat_<size_t> m_md_matrix;
+	cv::Mat_<size_t> m_md_matrix_double;
+
+	MGUATrainer<unsigned int> m_mgua_trainer;
 };
 
 }

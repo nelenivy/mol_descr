@@ -1,0 +1,3 @@
+output_folder=E:\Disser\Tests\bzr
+output_prefix=bzr
+file_with_set=E:\Disser\Sets\Activity\pharmocophore_kernel\bzr_3d.sd

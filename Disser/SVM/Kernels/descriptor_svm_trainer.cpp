@@ -1,3 +1,5 @@
+#include "stdafx.h"
+
 #include "descriptor_svm_trainer.h"
 #include <vector>
 #include <fstream>
@@ -14,17 +16,14 @@
 #include "modified_grid_search.h"
 #include "prepare_data_for_svm.h"
 #include "zero_one_loss_fuzzy.h"
+#include "modified_cv_folds.h"
 
 namespace molecule_descriptor
-{
+{	
 	void DescriptorSVMTrainerManager::SetData(const cv::Mat_<size_t>& data, const vector<unsigned int>& labels)
 	{
 		//convert data to shark format
-		std::vector<sing_pts_seq_wth_ind> data_wth_ind;
-		//CreateSeqWithIndexAndIdFromSeq(data.begin(), data.end(), m_curr_dataset_id, data_wth_ind);
-		++m_curr_dataset_id;
 		std::vector<RealVector> temp(data.rows, RealVector(data.cols));
-
 		for (int y = 0; y < data.rows; ++y)
 		{
 			for (int x = 0; x < data.cols; ++x)
@@ -33,7 +32,14 @@ namespace molecule_descriptor
 			}
 		}
 
-		m_labeled_data = PrepareDataForSVM(temp.begin(), temp.end(), labels.begin(), labels.end());
+		std::vector<sing_pts_seq_wth_ind> data_wth_ind;
+
+		CreateSeqWithIndexAndIdFromSeq(temp.begin(), temp.end(), m_curr_dataset_id, data_wth_ind);
+		++m_curr_dataset_id;
+		
+		m_labeled_data_with_ind = 
+			PrepareDataForSVM(data_wth_ind.begin(), data_wth_ind.end(), labels.begin(), labels.end());
+		m_labeled_data = CopyFromIndexedToNonIndexed(m_labeled_data_with_ind);
 		//shark::Data<sing_pts_seq_wth_ind> input_data = shark::createDataFromRange(temp/*_wth_ind*/);
 		//shark::Data<unsigned int> input_labels = shark::createDataFromRange(labels);
 		//const shark::LabeledData<sing_pts_seq_wth_ind, unsigned int> labeled_data(input_data, input_labels);
@@ -51,19 +57,20 @@ namespace molecule_descriptor
 	{
 		//trainer
 		const double C = 0.001;
-		shark::LinearKernel<sing_pts_seq_wth_ind> linear_kernel;
-		shark::CSvmTrainer<sing_pts_seq_wth_ind> svm_trainer(&linear_kernel, C, true, false);
+		shark::LinearKernel<sing_pts_seq/*_wth_ind*/> linear_kernel;
+		shark::CSvmTrainer<sing_pts_seq/*_wth_ind*/> svm_trainer(&linear_kernel, C, true, false);
 		// cross-validation error
-		const unsigned int N= m_labeled_data.elements().size();  // number of folds
-		shark::ZeroOneLossFuzzy<unsigned int, shark::RealVector> loss(-0.0, 1.0);
-		shark::CVFolds<shark::LabeledData<sing_pts_seq_wth_ind, unsigned int>> folds = shark::createCVSameSizeBalanced(m_labeled_data, N);
-		shark::CrossValidationError<shark::KernelExpansion<sing_pts_seq_wth_ind>, unsigned int> cv_error(
+		const unsigned int N= 5;//m_labeled_data.elements().size();  // number of folds
+		shark::ZeroOneLoss/*Fuzzy*/<unsigned int, unsigned int> loss/*(-1.0, 1.0)*/;
+		shark::CVFolds<shark::LabeledData<sing_pts_seq/*_wth_ind*/, unsigned int>> folds = 
+			shark::createCVSameSizeBalancedNoIndexedElems(m_labeled_data_with_ind, N);
+		shark::CrossValidationError<shark::KernelClassifier<sing_pts_seq/*_wth_ind*/>, unsigned int> cv_error(
 			folds, &svm_trainer, &m_kernel_expansion, &svm_trainer, &loss);
 		// find best parameters
 		std::vector<double> min(1);
 		std::vector<double> max(1);
 		std::vector<size_t> sections(1);
-		min[0] = -8; max[0] = -5; sections[0] = 3;  // regularization parameter C
+		min[0] = -8; max[0] = 2; sections[0] = 11;  // regularization parameter C
 		GridSearchFromEnd grid;
 		grid.configure(min, max, sections);
 		std::ofstream out(file_name + "_res_simple.txt");
@@ -73,16 +80,16 @@ namespace molecule_descriptor
 		svm_trainer.setParameterVector(grid.solution().point);
 		std::cout << grid.solution().value << "\n";
 		std::cout << grid.solution().point << "\n";
-		svm_trainer.train(m_kernel_expansion, m_labeled_data);
+		svm_trainer.train(m_kernel_expansion, m_labeled_data/*_with_ind*/);
 
 		EvaluateTrained();
 	}
 
 	void DescriptorSVMTrainerManager::EvaluateTrained()
 	{
-		m_eval_result = m_kernel_expansion(m_labeled_data.inputs());
+		/*m_eval_result = m_kernel_expansion(m_labeled_data.inputs());
 		shark::ZeroOneLossFuzzy<unsigned int, shark::RealVector> loss(-1.0, 1.0);
-		m_training_error = loss.eval(m_labeled_data.labels(), m_eval_result);
+		m_training_error = loss.eval(m_labeled_data.labels(), m_eval_result);*/
 	}
 
 	void DescriptorSVMTrainerManager::Write(const std::string& file_name)
