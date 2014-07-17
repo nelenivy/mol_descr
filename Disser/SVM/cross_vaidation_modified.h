@@ -129,7 +129,7 @@ namespace shark {
 			ret += mep_cost->eval(validation.labels(), output);
 			all_size += validation.numberOfElements();
 		}
-r 		return ret / all_size;
+ 		return ret / all_size;
 	}
 };
 

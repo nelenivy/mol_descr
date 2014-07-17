@@ -1,7 +1,8 @@
 #pragma once
 
 #include <utility>
-#include <tuple>
+//#include <tuple>
+#include "boost/tuple/tuple.hpp"
 #include <array>
 #include <stdint.h>
 #include "opencv2/core/core.hpp"
@@ -62,38 +63,44 @@ enum CurvatureTypes {kConvexType = 1, kConcaveType = 2, kSaddleType = 3};
 class PropertiesSet
 {
 public:
-	typedef std::tuple<size_t, int, float, int, float> tuple_type;
+	typedef boost::tuple<size_t, int, float, int, float, float> tuple_type;
 	inline size_t& SurfaceType() {
-		return std::get<0>(m_properties);
+		return boost::get<0>(m_properties);
 	}
 	inline const size_t& SurfaceType() const {
-		return std::get<0>(m_properties);
+		return boost::get<0>(m_properties);
 	}
 
 	inline int& Charge() {
-		return std::get<1>(m_properties);
+		return boost::get<1>(m_properties);
 	}
 	inline const int& Charge() const {
-		return std::get<1>(m_properties);
+		return boost::get<1>(m_properties);
 	}
 
 	inline float& ElectricPotential() {
-		return std::get<2>(m_properties);
+		return boost::get<2>(m_properties);
 	}
 	inline const float& ElectricPotential() const {
-		return std::get<2>(m_properties);
+		return boost::get<2>(m_properties);
 	}
 	inline int& LennardJonesType() {
-		return std::get<3>(m_properties);
+		return boost::get<3>(m_properties);
 	}
 	inline const int& LennardJonesType() const {
-		return std::get<3>(m_properties);
+		return boost::get<3>(m_properties);
 	}
 	inline float& LennardJones() {
-		return std::get<4>(m_properties);
+		return boost::get<4>(m_properties);
 	}
 	inline const float& LennardJones() const {
-		return std::get<4>(m_properties);
+		return boost::get<4>(m_properties);
+	}
+	inline float& Area() {
+		return boost::get<5>(m_properties);
+	}
+	inline const float& Area() const {
+		return boost::get<5>(m_properties);
 	}
 
 	inline tuple_type& GetAsTuple()//for convinience
@@ -114,7 +121,8 @@ inline bool operator ==(const PropertiesSet& p1, const PropertiesSet& p2)
 		(p1.ElectricPotential() == p2.ElectricPotential())
 		&& (p1.SurfaceType() == p2.SurfaceType())
 		&& (p1.LennardJonesType() == p2.LennardJonesType())
-		&& (p1.LennardJones() == p2.LennardJones());
+		&& (p1.LennardJones() == p2.LennardJones())
+		&& (p1.Area() == p2.Area());
 }
 template <typename PropType>
 struct WriteElemToFile<SingularPoint<PropType>>;

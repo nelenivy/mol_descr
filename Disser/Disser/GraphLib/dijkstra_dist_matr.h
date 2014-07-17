@@ -25,7 +25,7 @@ public:
 	void Calc(const GraphType& graph, cv::Mat_<float>& dist_mat)
 	{
 		m_edge_weights.SetGraph(graph);
-		const auto& info_3d_map = get(boost::vertex_info_3d, graph);
+		const auto info_3d_map = get(boost::vertex_info_3d, graph);
 		typename boost::graph_traits<GraphType>::edge_iterator curr_edge, end_edge;
 
 		for (auto curr_edge = edges(graph).first, end_edge = edges(graph).second; curr_edge != end_edge; ++curr_edge)

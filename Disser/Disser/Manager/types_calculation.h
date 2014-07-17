@@ -8,7 +8,10 @@ namespace molecule_descriptor
 template <typename T>
 size_t CalculateType(const T distance, const std::vector<T>& threshes)
 {
-	CV_Assert(!threshes.empty());
+	if (threshes.empty())
+	{
+		return 0;
+	}
 	int type = -1;
 
 	for (auto iter = threshes.begin(); iter != threshes.end() - 1; ++iter)
@@ -80,12 +83,40 @@ void CalculateThresholdsQuantiles(const int intervals, std::vector<T>& arr, std:
 {
 	std::sort(arr.begin(), arr.end());
 	quantiles.resize(intervals);
+
+	if (intervals == 0)
+	{
+		return;
+	}
 	const double elems_in_block = static_cast<double>(arr.size()) / (intervals + 1);
 
 	for (int block_ind = 1; block_ind <= intervals; block_ind++)
 	{
 		const size_t curr_ind = std::min(Round(block_ind * elems_in_block), static_cast<int>(arr.size() - 1));
 		quantiles[block_ind - 1] = arr[curr_ind];
+	}
+}
+
+template <typename T>
+void CalculateThresholdsLevels(const int intervals, const double alpha_thresh, std::vector<T>& arr, std::vector<T>& quantiles)
+{
+	CV_Assert(alpha_thresh >= 0.0);
+	CV_Assert(alpha_thresh < 0.5);
+	std::sort(arr.begin(), arr.end());
+	quantiles.clear();
+	if (intervals < 2)
+	{
+		return;
+	}
+	quantiles.resize(intervals);
+
+	
+	const T interval_start = quantiles[0] = arr[Round(static_cast<int>(arr.size() - 1) * alpha_thresh)];
+	const T interval_end = quantiles[intervals - 1] = arr[Round(static_cast<int>(arr.size() - 1) * (1.0 - alpha_thresh))];
+
+	for (int block_ind = 1; block_ind < intervals - 1; block_ind++)
+	{
+		quantiles[block_ind] = interval_start + (interval_end - interval_start) / static_cast<double>(intervals - 1) * block_ind;
 	}
 }
 

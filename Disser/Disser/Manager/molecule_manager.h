@@ -17,12 +17,27 @@ class MoleculeManager
 {
 public:	
 	MoleculeManager() : 
-		m_sing_pts_finder(CreateSingularPointsFinder()) 
+		m_sing_pts_finder(CreateSingularPointsFinder()), m_levels_num(0)
 	{ }
+	void SetLevelsNum(const int levels_num)
+	{
+		m_levels_num = levels_num;
+	}
+	void SetLevelsScales(const std::vector<double>& levels_scales)
+	{
+		m_levels_scales = levels_scales;
+	}
 	void SetCurrFilePrefix(const std::string& file_prefix);
 	void SetDistThresholds(const std::vector<double>& dist_threshes_)
 	{
 		m_dist_threshes = dist_threshes_;
+	}
+	void SetDistLevelsThresholds(const std::vector<std::vector<double>>& dist_threshes_level, const std::vector<double>& dist_high_thresh)
+	{
+		CV_Assert(m_levels_num == dist_threshes_level.size());
+		CV_Assert(m_levels_num == dist_high_thresh.size());
+		m_dist_threshes_levels = dist_threshes_level;
+		m_dist_high_threshes = dist_high_thresh;
 	}
 	void SetChargesThresholds(const std::vector<double>& charges_threshes_)
 	{
@@ -32,8 +47,12 @@ public:
 	{
 		m_lennard_jones_threshes = lennard_jones_threshes_;
 	}
+	void SetAreaThresholds(const std::vector<double>& area_threshes_)
+	{
+		m_area_threshes = area_threshes_;
+	}
 	void FindSingularPoints(const bool calculate, const bool calc_as_average);
-	void ReadAllSingularPoints();
+	void ReadAllSingularPoints(const int levels_num);
 	size_t GetPointsTypeNum();
 	void ClassifySingularPoints();
 	void GetSingularPoints(std::vector<MarkedSingularPoint>& sing_points) 
@@ -52,13 +71,19 @@ public:
 	}
 
 	void AppendDistances(std::vector<double>& distances);
-	void AppendCharges(std::vector<double>& charges);
-	void AppendLennardJones(std::vector<double>& lennard_jones);
+	void AppendDistancesLevels(std::vector<std::vector<double>>& distances);
+	void AppendCharges(std::vector<double>& charges, const bool levels = false);
+	void AppendLennardJones(std::vector<double>& lennard_jones, const bool levels = false);
+	void AppendAreas(std::vector<double>& areas, const bool levels = false);
 	void CalculatePropertiesTypes();
 	void CalculatePairsWithTypes();
+	void CalculatePairsWithTypesLevels();
 	void FindPairs(const bool calculate);
+	void FindPairsLevels(const bool calculate);
 	size_t GetPairsTypeNum();
+	size_t GetPairsTypeNumLevels();
 	void GetPairsHistogramm(cv::Mat_<size_t>& histogram);
+	void GetPairsHistogrammLevels(cv::Mat_<double>& histogram);
 	void GetNonMarkedPairs(std::vector<SingularPointsPair<PropertiesSet>>& non_marked_pairs)
 	{
 		non_marked_pairs = m_sing_pts_pairs_with_props_and_types.first;
@@ -82,11 +107,18 @@ private:
 	void CalculatePairs();
 	void WritePairs();
 	void ReadPairs();
+
+	void CalculatePairsLevels();
+	void WritePairsLevels();
+	void ReadPairsLevels(const int levels_num);
+
 	void CalculateSingularPoints(const bool calc_as_average);
 	void WriteSingularPoints();
 	void WriteSegmentedSurface();
 	void WriteTriangles(const std::vector<cv::Point3i>& triangles);
 	void WriteSurfaceWithTypes();
+	void ReadSingularPointsLevelsTypes(const int levels_num);
+	void ReadSingularPointsLevelsLabels(const int levels_num);
 private:
 	std::shared_ptr<ISingularPointsFinder> m_sing_pts_finder;
 	static const size_t kHistSize = 9;
@@ -102,12 +134,22 @@ private:
 
 	std::vector<point_with_type> m_singular_points;
 	std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>> m_non_marked_singular_points;
+	std::pair<std::vector<std::vector<NonMarkedSingularPoint>>, std::vector<std::vector<size_t>>> m_non_marked_singular_points_levels;
 	std::vector<HistogramSingularPoint<kHistSize>> m_histogram_singular_points;
 	std::pair<std::vector<SingularPointsPair<PropertiesSet>>, std::vector<size_t>> m_sing_pts_pairs_with_props_and_types;
-	std::vector<pair_with_distance> m_pairs;
+	std::pair<std::vector<std::vector<SingularPointsPair<PropertiesSet>>>, 
+		std::vector<std::vector<size_t>>> m_sing_pts_pairs_with_props_and_types_levels;
+
+	std::vector<pair_with_distance> m_pairs;	
 	std::vector<pair_with_distance_type> m_pairs_with_types;
 	std::vector<size_t> m_types;
 	std::vector<size_t> m_pairs_histogram;
+
+	std::vector<std::vector<pair_with_distance>> m_pairs_levels;
+	std::vector<std::vector<pair_with_distance_type>> m_pairs_with_types_levels;
+	std::vector<std::vector<size_t>> m_types_levels;
+	std::vector<double> m_pairs_histogram_levels;
+	std::vector<double> m_levels_scales;
 
 	std::vector<triangle> m_triples;
 	std::vector<triangle_with_type> m_triples_with_types;
@@ -115,8 +157,13 @@ private:
 
 	std::string m_curr_file_prefix;
 	std::vector<double> m_dist_threshes;
+	std::vector<std::vector<double>> m_dist_threshes_levels;
+	std::vector<double> m_dist_high_threshes;
 	std::vector<double> m_charge_threshes;
 	std::vector<double> m_lennard_jones_threshes;
+	std::vector<double> m_area_threshes;
+
+	int m_levels_num;
 };
 
 }

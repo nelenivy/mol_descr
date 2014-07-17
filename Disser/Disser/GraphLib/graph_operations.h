@@ -135,8 +135,7 @@ void SplitSegment(const boost::subgraph<GraphType>& graph, const size_t segment_
 }
 
 template <typename GraphType, typename SegmentsMap, typename CentersGraph>
-void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, const SegmentsMap& segments_map, 
-	std::vector<typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descriptor>& centers, 
+void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, const SegmentsMap& segments_map,
 	CentersGraph& centers_graph)
 {
 	//find clusters number
@@ -152,7 +151,6 @@ void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, co
 	}
 
 	//calculate new centers
-	centers.resize(clust_num);
 	std::vector<typename boost::graph_traits<CentersGraph>::vertex_descriptor> centers_nums(clust_num + 1);
 	centers_graph = CentersGraph();
 	size_t non_zero_cluster = 0;
@@ -165,17 +163,16 @@ void CalculateSegmentGraphAndCenters(const boost::subgraph<GraphType>& graph, co
 
 		if (res.second == true)
 		{
-			centers[non_zero_cluster] = res.first;
+			const auto center_descr = res.first;
 			const auto added = add_vertex(centers_graph);
 			centers_nums[curr_clust] = added;
 			put(boost::vertex_info_3d, centers_graph, added, 
-				get(boost::vertex_info_3d, graph, centers[non_zero_cluster]));
-			put(boost::vertex_parent, centers_graph, added, centers[non_zero_cluster]);		
+				get(boost::vertex_info_3d, graph, center_descr));
+			put(boost::vertex_parent, centers_graph, added, center_descr);		
 			++non_zero_cluster;
 		}
 	}
 
-	centers.resize(non_zero_cluster);
 	//calculate segments graph
 	for (auto node_iter = vertices(graph).first, graph_end = vertices(graph).second; node_iter != graph_end; ++node_iter)
 	{

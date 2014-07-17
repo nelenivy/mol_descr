@@ -164,6 +164,7 @@
     <ClCompile Include="SingularPoints\singular_points_finder.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Common\singular_point.h" />
     <ClInclude Include="CommonUtilities\classic_k_means.h" />
     <ClInclude Include="CommonUtilities\common_functions.h" />
     <ClInclude Include="CommonUtilities\priority_heap.h" />
@@ -183,9 +184,11 @@
     <ClInclude Include="Manager\set_manager.h" />
     <ClInclude Include="Manager\types_calculation.h" />
     <ClInclude Include="SingularPoints\i_singular_points_finder.h" />
+    <ClInclude Include="SingularPoints\points_keeper.h" />
     <ClInclude Include="SingularPoints\mesh_constructor.h" />
     <ClInclude Include="SingularPoints\mesh_operations.h" />
     <ClInclude Include="SingularPoints\mesh_types.h" />
+    <ClInclude Include="SingularPoints\segments_data.h" />
     <ClInclude Include="SingularPoints\singular_points_finder.h" />
   </ItemGroup>
   <ItemGroup>

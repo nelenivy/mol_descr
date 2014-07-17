@@ -8,9 +8,9 @@
 
 namespace molecule_descriptor
 {
-template <class Graph, class PropMap>
+template <class Graph, class PropMap, class CompareFunc>
 void FindLocalMaximums(const Graph& graph, const PropMap& prop_map, 
-		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>& maximums)
+		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>& maximums, CompareFunc comp_func)
 {
 	maximums.clear();
 
@@ -23,12 +23,11 @@ void FindLocalMaximums(const Graph& graph, const PropMap& prop_map,
 			end_neighb = adjacent_vertices(*curr_vertice, graph).second; 
 			curr_neighb != end_neighb; ++curr_neighb)
 		{
-			if (abs(prop_map[*curr_neighb]) >= abs(prop_map[*curr_vertice]))
+			if (! comp_func(abs(prop_map[*curr_vertice]), abs(prop_map[*curr_neighb])))
 			{
 				maximum = false;
 				break;
 			}
-
 		}
 
 		if (maximum)
@@ -36,6 +35,54 @@ void FindLocalMaximums(const Graph& graph, const PropMap& prop_map,
 			maximums.push_back(*curr_vertice);
 		}
 	}
+}
+
+//here we search not only through local members but through neighbours on levels
+template <class Graph, class PropMap>
+void FindLocalMaximumsOnLevels(const Graph& graph, const std::vector<PropMap>& prop_map_levels, 
+					   std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>& maximums)
+{
+	maximums.clear();
+	std::vector<size_t> max_level_count(prop_map_levels.size(), 0);
+
+	for (size_t level = 1; level < prop_map_levels.size(); ++level)
+	{
+		for (auto curr_vertice = vertices(graph).first, end_vertices = vertices(graph).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			bool maximum = true;
+			const size_t prev_level = level > 0? level - 1 : 0;
+			const size_t next_level = std::min(level + 1, prop_map_levels.size() - 1);
+
+			for (size_t neighb_level = prev_level; neighb_level <= next_level; ++neighb_level)
+			{
+				if (neighb_level != level && abs(prop_map_levels[neighb_level][*curr_vertice]) >= abs(prop_map_levels[level][*curr_vertice]))
+				{
+					maximum = false;
+					break;
+				}
+				for (auto curr_neighb = adjacent_vertices(*curr_vertice, graph).first, 
+					end_neighb = adjacent_vertices(*curr_vertice, graph).second; 
+					curr_neighb != end_neighb; ++curr_neighb)
+				{
+					if (abs(prop_map_levels[neighb_level][*curr_neighb]) >= abs(prop_map_levels[level][*curr_vertice]))
+					{
+						maximum = false;
+						break;
+					}
+				}
+			}
+
+			if (maximum)
+			{
+				max_level_count[level]++;
+				maximums.push_back(*curr_vertice);
+			}
+		}
+
+		std::cout << max_level_count[level] << " ";
+	}
+	std::cout << "\n";
 }
 
 template <class Graph, class WaveMap>
@@ -76,4 +123,5 @@ void WaveAlgorithm(const Graph& graph, const typename boost::property_traits<Wav
 		}
 	}	
 }
+
 }

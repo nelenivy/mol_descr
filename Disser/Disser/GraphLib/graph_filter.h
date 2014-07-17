@@ -58,7 +58,7 @@ public:
 		CV_Assert(m_center_vert_set);
 		return m_props_sum * (1.0 / m_coeffs_sum);
 	}
-	double GetRadius()
+	double GetRadius() const
 	{
 		return 3.0 * m_sigma;
 	}
@@ -94,7 +94,7 @@ public:
 		std::nth_element(m_props_cont.begin(), m_props_cont.begin() + m_props_cont.size() / 2, m_props_cont.end());
 		return m_props_cont[m_props_cont.size() / 2];
 	}
-	RadiusType GetRadius()
+	RadiusType GetRadius() const
 	{
 		return m_radius;
 	}
@@ -129,7 +129,7 @@ public:
 		CV_Assert(m_elems_num > 0.0);
 		return m_props_sum * (1.0 / m_elems_num);
 	}
-	RadiusType GetRadius()
+	RadiusType GetRadius() const
 	{
 		return m_radius;
 	}
@@ -312,4 +312,38 @@ void CalculateMedianProp(const Graph& graph, const SegmentsMap& segments_map, co
 	CalculateAveragePropUsingKernel(graph, segments_map, props_map,kernel, average_values);
 }
 
+template <typename GraphType, typename CoordMap>
+class AverageFinder
+{
+public:
+	typedef typename boost::property_traits<CoordMap>::value_type CoordType;
+	typedef typename boost::graph_traits<GraphType>::vertex_descriptor vertex_descriptor;
+	template <typename PropMap, typename Kernel>
+	typename boost::property_traits<PropMap>::value_type
+		GetAverageInRad(const GraphType& graph, const PropMap& prop_map, const CoordMap& coord_map, Kernel kernel, const vertex_descriptor vert)
+	{
+		typedef typename boost::property_traits<PropMap>::value_type PropType;
+		std::vector<vertex_descriptor> seed(1, vert);
+		m_mask.SetGraph(graph);
+		size_t segm_num = 0;
+		m_segmentator.SegmentImageSeeds(graph, coord_map, 0, seed, kernel.GetRadius(), m_mask, segm_num);
+		CV_Assert(segm_num > 0);
+		kernel.SetCentralVertice(coord_map[vert], prop_map[vert]);
+		for (auto curr_vert_coord = vertices(graph).first, end_vert_coord = vertices(graph).second;
+			curr_vert_coord != end_vert_coord; ++curr_vert_coord)
+		{
+			if (m_mask[*curr_vert_coord] == 0)
+			{
+				continue;
+			}
+			kernel.AddToSet(coord_map[*curr_vert_coord], prop_map[*curr_vert_coord]);
+		}
+
+		return kernel.GetResult();
+	}
+private:
+	typedef ContPropMap<GraphType, std::vector<uint8_t>, VERTEX> MaskType;
+	MaskType m_mask;
+	ConnectedComponentsSegmentator<GraphType, CoordMap, MaskType, double, DistFunc<CoordType>> m_segmentator;
+};
 }

@@ -91,6 +91,13 @@
     <ClInclude Include="Manager\types_calculation.h">
       <Filter>Manager</Filter>
     </ClInclude>
+    <ClInclude Include="..\Common\singular_point.h" />
+    <ClInclude Include="SingularPoints\segments_data.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\points_keeper.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

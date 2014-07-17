@@ -68,7 +68,6 @@ inline bool operator!=(const Vertice& vert_1, const Vertice& vert_2)
 	return !(vert_1 == vert_2);
 }
 
-
 template <typename VertexDescriptor, class Graph>
 struct Triangle
 {
@@ -93,7 +92,15 @@ struct Triangle
 		tr_normal.x *= 1.0 / 3.0;
 		return tr_normal;
 	}
-
+	double Area() const {
+		const auto pmap = get(boost::vertex_info_3d, *m_graph);
+		const double side_a = cv::norm(pmap[a].Center() - pmap[b].Center());
+		const double side_b = cv::norm(pmap[a].Center() - pmap[c].Center());
+		const double side_c = cv::norm(pmap[b].Center() - pmap[c].Center());
+		const double half_perim = (side_a + side_b + side_c) / 2.0;
+		const double area = sqrt(half_perim * (half_perim - side_a) * (half_perim - side_b) * (half_perim - side_c));
+		return area;
+	}
 	VertexDescriptor a;
 	VertexDescriptor b;
 	VertexDescriptor c;
@@ -109,7 +116,7 @@ template <typename VertexDescriptor, class Graph>
 double Distance(const Triangle<VertexDescriptor, Graph>& triangle_1, 
 				const Triangle<VertexDescriptor, Graph>& triangle_2)
 {
-	return norm(triangle_1.Center() - tr_cent_2.Center());
+	return norm(triangle_1.Center() - triangle_2.Center());
 }
 
 template <typename VertexDescriptor, class Graph>

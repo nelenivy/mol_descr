@@ -83,8 +83,13 @@ while(~(isempty(input_buf)))
             colour_matrix(type_ind,2) = 1;
             colour_matrix(type_ind,3) = 1;
         else        
-            curr_type = input_buf(4);
-            colour_matrix(type_ind,curr_type) = segments_matrix(type_ind) / max_segment;
+            curr_type = fix((input_buf(4) - 1) / 3) + 1
+            curr_type1 = mod(input_buf(4) - 1, 3) + 1;
+            
+            if (curr_type > 3)
+                colour_matrix(type_ind,curr_type) = segments_matrix(type_ind) / max_segment;
+            end
+            colour_matrix(type_ind,curr_type1) = segments_matrix(type_ind) / max_segment;
         end
         
         input_buf=fscanf(fid,'%*c %f %*s %f %*s %f %*s %f %*s',[1, 4]); 

@@ -1,0 +1,83 @@
+function triplets(mol_package,mol_prefix,mol_number,r)
+
+
+countl=0;
+d=[];
+for i=1:mol_number  
+    i=i
+    f=fopen([mol_package,'\',mol_prefix,int2str(i),'.dst'],'r');
+    l=fscanf(f,'%d',1);
+    dist=zeros(l,1);
+    for j=1:l
+        dist(j)=fscanf(f,'%f',1);
+    end
+    fclose(f);
+    map=zeros(l,l);
+    count=0;
+    for j=1:l-1
+        for k=i+1:l
+            count=count+1;
+            map(j,k)=count;
+        end
+    end
+    f=fopen([mol_package,'\',mol_prefix,int2str(i),'.trp'],'w');
+    fprintf(f,'%d\n',(l*(l-1)*(l-2))/6);
+    for j=1:l-2
+        for k=i+1:l-1
+            for m=k+1:l
+                countl=countl+1;
+                d(countl,1)=dist(map(j,k));
+                d(countl,2)=dist(map(k,m));
+                d(countl,3)=dist(map(j,m));
+                fprintf(f,'%f %f %f\n',dist(map(j,k)),dist(map(k,m)),dist(map(j,m)));
+            end
+        end
+    end
+end
+
+cluster_matrix= kmeans(dist,r);
+
+
+f=fopen([mol_package,'\',mol_prefix,'.clst'],'w'); 
+for i=1:countl
+    fprintf(f,'%d\n',cluster_matrix(i));
+end
+fclose(f);
+dist=[];
+MD=zeros(mol_number,216*k);
+count=
+'MD MATRIX CALCULATING'
+for i=1:mol_number
+    i=i
+    d=[];    
+     f=fopen([mol_package,'\',mol_prefix,int2str(i),'.sng'],'r'); 
+     l=fscanf(f,'%d',1);
+   % g=textread([mol_package,'\',mol_prefix,int2str(i),'.sng'],'%f');
+%     for j=1:length(g)/4
+%         d(j)=g(4*j);
+%     end    
+%     g=[];
+    for j=1:l  
+        g=fscanf(f,'%f',[1,3]);        
+        d(j)=fscanf(f,'%d',1);
+    end
+    fclose(f);
+    g=[];    
+    for j=1:length(d)-2
+        for k=j+1:length(d)-1
+            for m=k+1:length(d)
+                n=d(j)+6*(d(k)-1)+36*(d(k)-1)+36*k*(m-1);
+                MD(i,n)=MD(i,n)+1;
+            end
+        end
+    end
+    fclose(f);
+end
+f=fopen([mol_package,'\',mol_prefix,'.md'],'w');
+for i=1:mol_number
+    for j=1:108
+        fprintf(f,'%d ',MD(i,j));
+    end
+        fprintf(f,'\n');
+end
+MD=[];

@@ -20,9 +20,10 @@ public:
 	virtual void Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
-		const bool calc_prop_as_average);
+		const bool calc_prop_as_average, const int mesh_levels_num);
 	virtual void GetMarkedSingularPoints(std::vector<MarkedSingularPoint>& marked_singular_points);
 	virtual void GetNonMarkedSingularPoints(std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>>& non_marked_singular_points);
+	virtual void GetNonMarkedSingularPointsLevels(std::pair<std::vector<std::vector<NonMarkedSingularPoint>>, std::vector<std::vector<size_t>>>& non_marked_singular_points);
 	virtual void GetSingularPointsHisto(std::vector<HistogramSingularPoint<kHistSize>>& singular_points_hist);
 	//TODO: fix compile-time properties num. Maybe put pairs into this class
 	virtual void GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers);
@@ -35,11 +36,13 @@ private:
 	void CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges, const Mesh& mesh);
 	void CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const Mesh& mesh);
 	void CalculateVerticesSurfaceType(const Mesh& mesh);
+	void CalculateMaximumsCurvatureLevel(const Mesh& mesh, const int levels_num);
 	void SegmentMolecularSurface(const size_t max_segm_size, const Mesh& mesh);
 	void FindSegmentsGraphAndCenters(const Mesh& mesh);
 	void CalculateSingularPointsHistograms();
 	void CalculatePropsInSingPts(const bool calc_prop_as_average);
-
+	void CalcSegmentsArea(/*const Mesh& mesh*/);
+	void CalcShiftsMaximums();
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesTypeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> VetrticesCurvMap;
@@ -53,30 +56,36 @@ private:
 
 	typedef ContPropMap<TrianglesGraph, std::vector<uint8_t>, VERTEX> TrianglesCurvMap;
 	typedef ContPropMap<TrianglesGraph, std::vector<size_t>, VERTEX> TrianglesSegmMap;
+	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> DoubleVertGraphProp;
 
 	template<typename GraphPropMap>
 	void CalcPropInSingPts(const GraphPropMap& graph_prop_map, const bool calc_prop_as_average, SingPtsDoublePropMap& sing_pts_prop_map);
 
 	MeshKeeper m_mesh_keeper;
 	Mesh m_filtered_mesh;
-	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> m_curvature_1;
-	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> m_curvature_0;
+	std::vector<Mesh> m_filtered_mesh_levels;
+	std::vector<Mesh> m_filtered_mesh_levels_2;
+	DoubleVertGraphProp m_curvature_1;
+	DoubleVertGraphProp m_curvature_0;
 
+	std::vector<VertexDescriptor> m_maximums;
+	std::vector<std::vector<VertexDescriptor>> m_maximums_with_levels;
 	//FilteredCoordMap m_filtered_coord;
 	//VetrticesTypeMap m_vertices_type_map;
 	VetrticesChargeMap m_vertex_charge_map;
 	VetrticesChargeMap m_vertex_lennard_jones_map;
 	VetrticesCurvMap m_vertex_curv_type;
+	std::vector<VetrticesCurvMap> m_vertex_curv_type_mesh_levels;
 	VetrticesSegmMap m_vertex_segm;
 	VetrticesSegmScoreMap m_vertex_score_map;
 	TrianglesCurvMap m_triangle_curv_type;
 	TrianglesSegmMap m_triangles_segm;
 	std::array<TrianglesSegmMap, 3>  m_type_triangle_segm;
-	std::vector<VertexDescriptor> m_singular_points;
 	SingularPointsGraph m_singular_points_graph;
 	SingPtsHistMap m_sing_pts_histo;
 	SingPtsDoublePropMap m_sing_pts_potential;
 	SingPtsDoublePropMap m_sing_pts_lennard_jones;
+	SingPtsDoublePropMap m_sing_pts_segm_area;
 };
 
 }

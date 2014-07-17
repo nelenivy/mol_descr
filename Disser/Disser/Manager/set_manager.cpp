@@ -6,6 +6,7 @@
 
 #include <utility>
 #include <functional>
+#include <limits>
 
 #include "opencv2/core/core.hpp"
 #include "shark\LinAlg\BLAS\matrix.hpp"
@@ -35,6 +36,7 @@ void SetManager::Init(int argc, char** argv)
 {
 	ReadParamsFromCommandLine(argc, argv);
 	FindOutMoleculesNum();
+	m_molecule_manager.SetLevelsNum(m_mesh_levels_num);
 }
 
 void SetManager::ProcessSingularPoints(const bool calculate)
@@ -44,20 +46,24 @@ void SetManager::ProcessSingularPoints(const bool calculate)
 	std::cout << "Singular Points Processing\n";
 	std::vector<double> charges, charges_thresh;//for charges classification
 	std::vector<double> lennard_jones, lennard_jones_thresh;//for lennard-jones classification
+	std::vector<double> areas, areas_thresh;//for areas classification
 	const bool calc_as_average = false;
 	for (int ind = 0; ind < m_molecules_num; ++ind)
 	{
 		std::cout << ind << "\n";
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
 		m_molecule_manager.FindSingularPoints(calculate, calc_as_average);
-		m_molecule_manager.AppendCharges(charges);
-		m_molecule_manager.AppendLennardJones(lennard_jones);
+		m_molecule_manager.AppendCharges(charges, false/*true*/);
+		m_molecule_manager.AppendLennardJones(lennard_jones, false/*true*/);
+		m_molecule_manager.AppendLennardJones(areas, false/*true*/);
 	}
 
 	CalculateThresholdsQuantiles(2, charges, charges_thresh);
 	CalculateThresholdsQuantiles(2, lennard_jones, lennard_jones_thresh);
+	CalculateThresholdsQuantiles(0, areas, areas_thresh);
 	m_molecule_manager.SetChargesThresholds(charges_thresh);
 	m_molecule_manager.SetLennardJonesThresholds(lennard_jones_thresh);
+	m_molecule_manager.SetAreaThresholds(areas_thresh);
 
 	for (int ind = 0; ind < m_molecules_num; ++ind)
 	{
@@ -67,6 +73,48 @@ void SetManager::ProcessSingularPoints(const bool calculate)
 	}
 }
 
+void SetManager::ProcessPairsLevels(const bool calculate)
+{
+	CV_Assert(m_inited);
+	//calculate pairs and write distances
+	m_distances_levels.clear();
+	m_dist_thresholds.resize(m_distances_intervals);
+	std::cout << "Pairs Processing\n";
+
+	for (int ind = 0; ind < m_molecules_num; ++ind)
+	{
+		std::cout << ind << "\n";
+		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
+		m_molecule_manager.FindPairsLevels(calculate);
+		m_molecule_manager.AppendDistancesLevels(m_distances_levels);
+	}
+
+	//CalculateDistThresholdsKMeans();
+	CalculateThresholdLevels();
+	m_molecule_manager.SetDistLevelsThresholds(m_dist_thresholds_levels, m_high_thresholds);
+	std::vector<double> levels_scales(m_dist_thresholds_levels.size());
+	levels_scales[0] = 1.0;
+	for (int ind = 0; ind < levels_scales.size(); ++ind)
+	{
+		levels_scales[ind] = 1.0;//static_cast<double>(m_distances_levels[0].size()) / m_distances_levels[ind].size();
+	}
+	m_molecule_manager.SetLevelsScales(levels_scales);
+	const int pairs_types_num = static_cast<int>(m_molecule_manager.GetPairsTypeNumLevels());
+	m_md_matrix_double.create(m_molecules_num, pairs_types_num);
+	//calculate distance types and write them to the matrix
+	for (int ind = 0; ind < m_molecules_num; ++ind)
+	{
+		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
+		m_molecule_manager.FindPairsLevels(kNotCalculate);
+		m_molecule_manager.CalculatePairsWithTypesLevels();
+		m_molecule_manager.GetPairsHistogrammLevels(m_md_matrix_double.row(ind));
+	}
+
+	m_processed = true;
+	WriteMatrix(m_md_matrix_double, m_mol_folder + m_mol_prefix + Extensions::PairsMDMatrixLevels());
+}
 void SetManager::ProcessPairs(const bool calculate)
 {
 	CV_Assert(m_inited);
@@ -79,13 +127,14 @@ void SetManager::ProcessPairs(const bool calculate)
 	{
 		std::cout << ind << "\n";
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.FindPairs(calculate);
 		m_molecule_manager.AppendDistances(m_distances);
 	}
 
 	//CalculateDistThresholdsKMeans();
-	CalculateThresholdsQuantiles(m_distances_intervals, m_distances, m_dist_thresholds);
+	CalculateThresholdsLevels(m_distances_intervals, 0.05, m_distances, m_dist_thresholds);
+	//CalculateThresholdsQuantiles(m_distances_intervals, m_distances, m_dist_thresholds);
 	m_molecule_manager.SetDistThresholds(m_dist_thresholds);
 	const int pairs_types_num = static_cast<int>(m_molecule_manager.GetPairsTypeNum());
 	m_md_matrix.create(m_molecules_num, pairs_types_num);
@@ -93,7 +142,7 @@ void SetManager::ProcessPairs(const bool calculate)
 	for (int ind = 0; ind < m_molecules_num; ++ind)
 	{
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.FindPairs(kNotCalculate);
 		m_molecule_manager.CalculatePairsWithTypes();
 		m_molecule_manager.GetPairsHistogramm(m_md_matrix.row(ind));
@@ -101,6 +150,40 @@ void SetManager::ProcessPairs(const bool calculate)
 
 	m_processed = true;
 	WriteMatrix(m_md_matrix, m_mol_folder + m_mol_prefix + Extensions::PairsMDMatrix());
+}
+
+void SetManager::CalculateThresholdLevels()
+{
+	const int levels_num = m_distances_levels.size();
+	CV_Assert(levels_num > 1);
+	m_high_thresholds.resize(levels_num, std::numeric_limits<double>::max());
+	m_dist_thresholds_levels.resize(levels_num);
+	m_high_thresholds[levels_num - 1] = std::numeric_limits<double>::max();
+	CV_Assert(m_distance_quantile_for_thresh <= m_distance_interval_levels);
+
+	for (int level = levels_num - 1; level >= 0; --level)
+	{
+		//delete too large distances
+		const auto first_elem_higher_than_thresh = std::partition(m_distances_levels[level].begin(), m_distances_levels[level].end(),
+			[&](const double dist)->bool
+		{
+			return dist < m_high_thresholds[level];
+		});
+		m_distances_levels[level].erase(first_elem_higher_than_thresh, m_distances_levels[level].end());
+		std::vector<double> thresh_levels, thresh_quantiles;
+		CalculateThresholdsLevels(m_distance_interval_levels, 0.02, m_distances_levels[level], thresh_levels);
+		CalculateThresholdsQuantiles(m_distance_interval_levels, m_distances_levels[level], thresh_quantiles);
+		const double alpha = 1.0;
+		m_dist_thresholds_levels[level].resize(m_distance_interval_levels);
+		for (size_t ind = 0; ind < m_distance_interval_levels; ++ind)
+		{
+			m_dist_thresholds_levels[level][ind] = alpha * thresh_levels[ind] + (1.0  - alpha) * thresh_quantiles[ind];
+		}
+		if (level > 0 /*&& level < 8*/)
+		{
+			m_high_thresholds[level - 1] = m_dist_thresholds_levels[level][m_distance_quantile_for_thresh];
+		}
+	}
 }
 
 void SetManager::ProcessTriples(const bool calculate)
@@ -115,7 +198,7 @@ void SetManager::ProcessTriples(const bool calculate)
 	{
 		std::cout << ind << "\n";
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.FindTriples(calculate);
 		m_molecule_manager.CalculateTriplesWithTypes();
 		m_molecule_manager.GetTriplesHistogramm(m_md_matrix.row(ind));
@@ -132,7 +215,7 @@ void SetManager::ProcessKernelSVMPoints()
 	for (int ind = 0; ind < m_molecules_num; ind++)
 	{
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.GetNonMarkedSingularPoints(pts[ind]);
 	}
 
@@ -196,7 +279,7 @@ void SetManager::ProcessKernelSVMPointsWithFiltering()
 		std::vector<SingularPointsPair<PropertiesSet>>& curr_pairs = sing_pts_pairs[ind];
 		std::cout << ind << "\n";
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.GetNonMarkedSingularPoints(sing_pts);
 		m_molecule_manager.FindPairs(kNotCalculate);
 		m_molecule_manager.CalculatePairsWithTypes();
@@ -283,7 +366,7 @@ void SetManager::ProcessKernelSVMHistograms()
 	for (int ind = 0; ind < m_molecules_num; ind++)
 	{
 		m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-		m_molecule_manager.ReadAllSingularPoints();
+		m_molecule_manager.ReadAllSingularPoints(m_mesh_levels_num);
 		m_molecule_manager.GetHistogramSingularPoints(pts[ind]);
 	}
 
@@ -337,7 +420,7 @@ void SetManager::ProcessDescriptorsSVM()
 void SetManager::ProcessMGUASVMClassification(const int iter_num, const int descr_num)
 {
 	//read MD matrix
-	molecule_descriptor::ReadMatrix(m_md_matrix, m_mol_folder + m_mol_prefix + Extensions::PairsMDMatrix());
+	molecule_descriptor::ReadMatrix(m_md_matrix_double, m_mol_folder + m_mol_prefix + Extensions::PairsMDMatrixLevels());
 	//read labels
 	std::vector<int> labels;
 	molecule_descriptor::ReadVector(m_mol_folder + m_mol_prefix + Extensions::Labels(), labels);
@@ -363,7 +446,7 @@ void SetManager::ProcessMGUASVMClassification(const int iter_num, const int desc
 	}
 
 	m_mgua_trainer = MGUATrainer<unsigned int>();
-	m_mgua_trainer.SetData(m_md_matrix, unsigned_labels, true);
+	m_mgua_trainer.SetData(m_md_matrix_double, unsigned_labels, true);
 	m_mgua_trainer.SetParameters(iter_num, descr_num);
 	//m_mgua_trainer.TrainOneSet(svm_vect[0], m_mol_folder + m_mol_prefix);
 	m_mgua_trainer.Train(svm_vect, m_mol_folder + m_mol_prefix,true);

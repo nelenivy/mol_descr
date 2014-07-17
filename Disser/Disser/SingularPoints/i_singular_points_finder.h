@@ -18,10 +18,11 @@ public:
 	virtual void Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
-		const bool calc_prop_as_average) = 0;
+		const bool calc_prop_as_average, const int mesh_levels_num) = 0;
 	//returns number of types of properties. Is a product of properties ranges
 	virtual void GetMarkedSingularPoints(std::vector<MarkedSingularPoint>& marked_singular_points) = 0;
 	virtual void GetNonMarkedSingularPoints(std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>> & non_marked_singular_points) = 0;
+	virtual void GetNonMarkedSingularPointsLevels(std::pair<std::vector<std::vector<NonMarkedSingularPoint>>, std::vector<std::vector<size_t>>>& non_marked_singular_points) = 0;
 	virtual void GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers) = 0;
 	virtual void GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types) = 0;
 	static const size_t kHistSize = 9;
