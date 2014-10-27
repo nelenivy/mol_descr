@@ -13,7 +13,7 @@ namespace molecule_descriptor
 class SetManager
 {
 public:
-	SetManager() : m_inited(false), m_processed(false), m_distance_interval_levels(10), m_distance_quantile_for_thresh(9), m_mesh_levels_num(12) {}
+	SetManager() : m_inited(false), m_processed(false) {}
 	void Init(int argc, char** argv);
 	void ProcessSet();
 	void ProcessSingularPoints(const bool calculate);
@@ -41,6 +41,9 @@ private:
 	int m_distance_interval_levels;
 	int m_distance_quantile_for_thresh;
 	int m_mesh_levels_num;
+	int m_charges_threshes_num;
+	int m_lennard_jones_threshes_num;
+	int m_areas_threshes_num;
 	MoleculeManager m_molecule_manager;
 	std::vector<double> m_distances;
 	std::vector<double> m_dist_thresholds;

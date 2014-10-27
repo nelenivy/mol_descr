@@ -27,4 +27,26 @@ bool ReadParamFromCommandLine(int argc, char** argv, const std::string& param_ke
 	return false;
 }
 
+template <typename T>
+bool ReadParamFromCommandLineWithDefault(int argc, char** argv, const std::string& param_key, T& param, const T default_val)
+{
+	for (int ind = 1; ind < argc; ++ind)
+	{
+		if (std::string(argv[ind]) == param_key)
+		{
+			if (ind == argc - 1)
+			{
+				return false;
+			}
+
+			std::stringstream string_param;
+			string_param << argv[ind + 1];
+			string_param >> param;
+			return true;
+		}
+	}
+
+	param = default_val;
+	return true;
+}
 }

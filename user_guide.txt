@@ -1,0 +1,49 @@
+	Приготовление выборки к использованию
+1. Установить программу DS Visualizer http://accelrys.com/products/discovery-studio/visualization-download.php
+2. Создать папку, в которой будет обрабатываться выборка %set_folder%, выбрать префикс %set_prefix%, которым будут обозначаться соединения.
+3. В папке %set_folder% создать файл settings.txt, который заполнить следующим образом:
+output_folder=%set_folder%
+output_prefix=%set_prefix%
+file_with_set=%расположение файла с выборкой%\%имя файла с выборкой%
+пробелов и русскх букв быть не должно
+4. в бат-файле process_sdf.bat заменить следующие значения 
+set settings_file=%set_folder%\settings.txt
+set scripts_folder=%папка, в которой расположен process_sdf.bat%
+set DS_perl_path="%папка, в которую установлен Discovery Studio%\bin\perl.bat"
+5. Запустить файл process_sdf.bat, подождать, пока скрипт не завершит работу. В результате в папке %set_folder% будет набор файлов %set_prefix%_%номер файла% с расширениями wdv, wrl и ch.
+
+	Выделение столбца свойств из файла
+Есть три варианта записи активности в sdf-файле - 
+	а. активный\не активный, 
+	б. вещественное значение свойства 
+	в. вещественное значение, превращаемое в активный\ не активный отсечением по порогу
+а). При варианте а запускаем файл DiskrActivityFromSdf.m с параметрами (sdf, output_file, activity_string, no_activity_string)
+sdf - sdf файл, который обрабатываем
+output_file - файл, в который записываются значения активности,
+activity_string - строка, которой обозначается активное соединение,
+no_activity_string - строка, которой обозначается активное соединение
+б). При варианте б запускаем файл ActivityFromSdf.m с параметрами (sdf, output_file, activity_string)
+sdf - sdf файл, который обрабатываем
+output_file - файл, в который записываются значения активности,
+activity_string - строка, которой обозначается строка в файле, где записано значение свойства
+в).При варианте в запускаем файл ThreshActivityFromSdf.m с параметрами (sdf, output_file, activity_string, threshold)
+sdf - sdf файл, который обрабатываем
+output_file - файл, в который записываются значения активности,
+activity_string - строка, которой обозначается строка в файле, где записано значение свойства
+threshold - порог для свойства, при значении ниже порога вещество считается не  активным, при значении больше порога - считается активным.
+
+	Нахождение ОТ и прогноз
+1. Изменить бат-файл run.bat
+%путь к exe-файлу% -mol_folder %set_folder% -mol_prefix %set_prefix% -distances_intervals 10 -distances_intervals_levels 10 -mesh_levels_num 10 -charges_threshes_num 2 -lennard_jones_threshes_num 2 -areas_threshes_num 0 -use_levels 1 -calculate_singular_points 1 -mgua_iterations_num 30 -mgua_descriptors_num 15
+
+-distances_intervals - количество интервалов разбиения расстояния в парах ОТ для немасштабируемого алгоритма.
+-distances_intervals_levels - количество интервалов разбиения расстояния в парах ОТ для масштабируемого алгоритма.
+-charges_threshes_num - количество интервалов разбиения значений заряда
+-lennard_jones_threshes_num - количество интервалов разбиения значений потенциала леннарда-джонса
+-areas_threshes_num - количество интервалов разбиения значений площади сегмента для немногомасштабного алгоритма
+-use_levels - использовать ли многомасштабный алгоритм
+-calculate_singular_points - вычислять ли ОТ или пользоваться ранее вычисленными 
+-mgua_iterations_num 30 - количество итераций МГУА
+-mgua_descriptors_num 15 - количество дескритпоров, отбираемых на каждой итерации
+2. Запустить run.bat. В результате должны появиться файлы со многими расширениями - это нахождение ОТ. Потом на экране часто замелькают цифры - это МГУА. 
+Лучшие дескрипторы на каждой итерации записываются в файл %set_folder%\%set_prefix%_descr_set.txt

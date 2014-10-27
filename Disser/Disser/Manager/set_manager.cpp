@@ -58,9 +58,9 @@ void SetManager::ProcessSingularPoints(const bool calculate)
 		m_molecule_manager.AppendLennardJones(areas, false/*true*/);
 	}
 
-	CalculateThresholdsQuantiles(2, charges, charges_thresh);
-	CalculateThresholdsQuantiles(2, lennard_jones, lennard_jones_thresh);
-	CalculateThresholdsQuantiles(0, areas, areas_thresh);
+	CalculateThresholdsQuantiles(m_charges_threshes_num, charges, charges_thresh);
+	CalculateThresholdsQuantiles(m_lennard_jones_threshes_num, lennard_jones, lennard_jones_thresh);
+	CalculateThresholdsQuantiles(m_areas_threshes_num, areas, areas_thresh);
 	m_molecule_manager.SetChargesThresholds(charges_thresh);
 	m_molecule_manager.SetLennardJonesThresholds(lennard_jones_thresh);
 	m_molecule_manager.SetAreaThresholds(areas_thresh);
@@ -543,6 +543,16 @@ void SetManager::ReadParamsFromCommandLine(int argc, char** argv)
 
 	ReadParamFromCommandLine(argc, argv, "-mol_prefix", m_mol_prefix);
 	ReadParamFromCommandLine(argc, argv, "-distances_intervals", m_distances_intervals);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-distances_intervals_levels", m_distance_interval_levels, 10);
+	m_distance_quantile_for_thresh = m_distance_interval_levels - 1;
+	ReadParamFromCommandLineWithDefault(argc, argv, "-mesh_levels_num", m_mesh_levels_num, 10);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-charges_threshes_num", m_charges_threshes_num, 2);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-lennard_jones_threshes_num", m_lennard_jones_threshes_num, 2);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-areas_threshes_num", m_areas_threshes_num, 0);
+	m_mesh_levels_num;
+	int m_charges_threshes_num;
+	int m_lennard_jones_threshes_num;
+	int m_areas_threshes_num;
 	m_inited = true;
 }
 
