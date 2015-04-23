@@ -117,6 +117,10 @@ public:
 	{
 		std::fill(m_container.begin(), m_container.end(), ContValueType());
 	}
+	size_t Size() const
+	{
+		return m_container.size();
+	}
 private:
 	Container m_container;
 };

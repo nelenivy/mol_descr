@@ -137,9 +137,18 @@ public:
 			m_folds, meta_obj, m_model.get(), m_svm_trainer.get(), m_loss.get());
 		m_grid->step(cv_error);
 		//evaluate trained
-		return m_grid->solution().value;
 		meta_obj->setParameterVector(m_grid->solution().point);
-		
+		return m_grid->solution().value;		
+	}
+
+	const Model& TrainedModel(shark::LabeledData<InputTypeT, LabelT>& train_set) 
+	{
+		m_svm_trainer->train(*m_model, train_set);
+		return *m_model;
+	}
+	const shark::RealVector OptimalParams() const
+	{
+		return m_grid->solution().point;
 	}
 	CrossValidationSvmTrainer<InputTypeT, LabelT, Model, kCacheKernel>& operator=(CrossValidationSvmTrainer<InputTypeT, LabelT, Model, kCacheKernel>&& trainer)
 	{

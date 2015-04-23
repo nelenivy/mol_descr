@@ -61,6 +61,7 @@ namespace molecule_descriptor
 		void SetData(const cv::Mat_<size_t>& data,
 			const vector<unsigned int>& labels);//Convert input to shark format
 		void Train(const std::string& file_name);
+		void TrainL0Approx(const std::string& file_name);
 		void Write(const std::string& file_name);
 	private:
 		void EvaluateTrained();

@@ -88,7 +88,7 @@ template <typename InputTypeT>
 void MGUATrainer<LabelT>::SetData(const cv::Mat_<InputTypeT>& data,
 							 const std::vector<LabelT>& labels, const bool normalize)
 {
-	//convert data to shark format
+
 	std::vector<data_type> temp(data.rows, data_type(data.cols));
 
 	for (int y = 0; y < data.rows; ++y)
@@ -98,27 +98,34 @@ void MGUATrainer<LabelT>::SetData(const cv::Mat_<InputTypeT>& data,
 			temp[y][x] = data(y, x);
 		}		
 	}
-
+	//convert data to shark format
 	if (normalize)
 	{
 		for (int x = 0; x < data.cols; ++x)
 		{
-			double norm = 0;
+			double mean = 0;
 			for (int y = 0; y < data.rows; ++y)
 			{
-				norm += data(y, x) * data(y, x);
+				mean += data(y, x);
 			}
-			norm = sqrt(norm);
-
-			if (norm > 0.0)
+			mean /= data.rows;
+			double dev = 0;
+			for (int y = 0; y < data.rows; ++y)
 			{
-				for (int y = 0; y < data.rows; ++y)
+				dev += (mean - data(y, x)) * (mean - data(y, x));
+			}
+			dev /= data.rows;
+			for (int y = 0; y < data.rows; ++y)
+			{
+				temp[y][x] = (data(y, x) - mean);
+				if (dev > 0.0)
 				{
-					temp[y][x] /= norm;
+					temp[y][x] /= sqrt(dev);
 				}
 			}
 		}
 	}
+
 	m_descriptors_num = data.cols;
 	shark::Data<data_type> input_data = shark::createDataFromRange(temp/*_wth_ind*/);
 	shark::Data<LabelT> input_labels = shark::createDataFromRange(labels);

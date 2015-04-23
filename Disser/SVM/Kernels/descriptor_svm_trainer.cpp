@@ -85,6 +85,8 @@ namespace molecule_descriptor
 		EvaluateTrained();
 	}
 
+
+
 	void DescriptorSVMTrainerManager::EvaluateTrained()
 	{
 		/*m_eval_result = m_kernel_expansion(m_labeled_data.inputs());

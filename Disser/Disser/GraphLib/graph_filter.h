@@ -16,7 +16,7 @@
 namespace molecule_descriptor
 {
 
-double Distance(const cv::Point3d& elem1, const cv::Point3d elem2)
+inline double Distance(const cv::Point3d& elem1, const cv::Point3d elem2)
 {
 	return norm(elem1 - elem2);
 }
@@ -155,8 +155,9 @@ public:
 	}
 	template <class PropMapIn, class PropMapOut>
 	void Filter(const GraphType& graph, const CoordinateMapIn& coord_in,
-		const PropMapIn& prop_map_in, PropMapOut& prop_map_out)
+		const std::vector<PropMapIn>& prop_map_in, std::vector<PropMapOut>& prop_map_out)
 	{
+		CV_Assert(prop_map_in.size() == prop_map_out.size());
 		const double max_rad = m_kernel.GetRadius();
 		typedef boost::graph_traits<GraphType>::vertex_descriptor vertex_descriptor;
 		std::vector<vertex_descriptor> seed(1);
@@ -168,19 +169,31 @@ public:
 			size_t segm_num = 0;
 			m_segmentator.SegmentImageSeeds(graph, coord_in, 0, seed, max_rad, m_mask, segm_num);
 			CV_Assert(segm_num > 0);
-			m_kernel.SetCentralVertice(coord_in[*curr_vert], prop_map_in[*curr_vert]);
-			for (auto curr_vert_coord = vertices(graph).first, end_vert_coord = vertices(graph).second;
-				curr_vert_coord != end_vert_coord; ++curr_vert_coord)
-			{
-				if (m_mask[*curr_vert_coord] == 0)
-				{
-					continue;
-				}
-				m_kernel.AddToSet(coord_in[*curr_vert_coord], prop_map_in[*curr_vert_coord]);
-			}
 
-			prop_map_out[*curr_vert] = m_kernel.GetResult();
+			for (size_t curr_prop = 0; curr_prop < prop_map_in.size(); ++curr_prop)
+			{
+				m_kernel.SetCentralVertice(coord_in[*curr_vert], prop_map_in[curr_prop][*curr_vert]);
+				for (auto curr_vert_coord = vertices(graph).first, end_vert_coord = vertices(graph).second;
+					curr_vert_coord != end_vert_coord; ++curr_vert_coord)
+				{
+					if (m_mask[*curr_vert_coord] == 0)
+					{
+						continue;
+					}
+					m_kernel.AddToSet(coord_in[*curr_vert_coord], prop_map_in[curr_prop][*curr_vert_coord]);
+				}
+
+				prop_map_out[curr_prop][*curr_vert] = m_kernel.GetResult();
+			}
 		}	
+	}
+	template <class PropMapIn, class PropMapOut>
+	void Filter(const GraphType& graph, const CoordinateMapIn& coord_in,
+		const PropMapIn& prop_map_in, PropMapOut& prop_map_out)
+	{
+		std::vector<ProxyPropMap<const PropMapIn, IdenticalTransformFunc>> prop_map_in_vect_ref(1, GetPropMapReference(prop_map_in));
+		std::vector<ProxyPropMap<PropMapOut, IdenticalTransformFunc>> prop_map_out_vect_ref(1, GetPropMapReference(prop_map_out));
+		Filter(graph, coord_in,	prop_map_in_vect_ref, prop_map_out_vect_ref);		
 	}
 private:
 	typedef ContPropMap<GraphType, std::vector<uint8_t>, VERTEX> MaskType;
@@ -207,8 +220,9 @@ public:
 		m_kernel = kernel;
 	}
 	template <class PropMapIn, class PropMapOut>
-	void Filter(const GraphType& graph, const PropMapIn& prop_map_in, PropMapOut& prop_map_out)
+	void Filter(const GraphType& graph, const std::vector<PropMapIn>& prop_map_in, std::vector<PropMapOut>& prop_map_out)
 	{
+		CV_Assert(prop_map_in.size() == prop_map_out.size());
 		const size_t max_rad = m_kernel.GetRadius();
 		typedef boost::graph_traits<GraphType>::vertex_descriptor vertex_descriptor;
 		m_mask.SetGraph(graph);
@@ -217,19 +231,30 @@ public:
 		{
 			const vertex_descriptor seed = *curr_vert;
 			WaveAlgorithm(graph, max_rad, seed, m_mask);
-			m_kernel.SetCentralVertice(*curr_vert, prop_map_in[*curr_vert]);
-			for (auto curr_vert_coord = vertices(graph).first, end_vert_coord = vertices(graph).second;
-				curr_vert_coord != end_vert_coord; ++curr_vert_coord)
-			{
-				if (m_mask[*curr_vert_coord] == 0)
-				{
-					continue;
-				}
-				m_kernel.AddToSet(*curr_vert_coord, prop_map_in[*curr_vert_coord]);
-			}
 
-			prop_map_out[*curr_vert] = m_kernel.GetResult();
+			for (size_t curr_prop = 0; curr_prop < prop_map_in.size(); ++curr_prop)
+			{
+				m_kernel.SetCentralVertice(*curr_vert, prop_map_in[curr_prop][*curr_vert]);
+				for (auto curr_vert_coord = vertices(graph).first, end_vert_coord = vertices(graph).second;
+					curr_vert_coord != end_vert_coord; ++curr_vert_coord)
+				{
+					if (m_mask[*curr_vert_coord] == 0)
+					{
+						continue;
+					}
+					m_kernel.AddToSet(*curr_vert_coord, prop_map_in[curr_prop][*curr_vert_coord]);
+				}
+
+				prop_map_out[curr_prop][*curr_vert] = m_kernel.GetResult();
+			}
 		}	
+	}
+	template <class PropMapIn, class PropMapOut>
+	void Filter(const GraphType& graph, const PropMapIn& prop_map_in, PropMapOut& prop_map_out)
+	{
+		std::vector<ProxyPropMap<const PropMapIn, IdenticalTransformFunc>> prop_map_in_vect_ref(1, GetPropMapReference(prop_map_in));
+		std::vector<ProxyPropMap<PropMapOut, IdenticalTransformFunc>> prop_map_out_vect_ref(1, GetPropMapReference(prop_map_out));
+		Filter(graph, prop_map_in_vect_ref, prop_map_out_vect_ref);
 	}
 private:
 	typedef ContPropMap<GraphType, std::vector<uint8_t>, VERTEX> MaskType;

@@ -20,10 +20,12 @@ public:
 	void ProcessPairs(const bool calculate);
 	void ProcessPairsLevels(const bool calculate);
 	void ProcessTriples(const bool calculate);
+	void ProcessTriplesLevels(const bool calculate);
 	void ProcessKernelSVMPoints();
 	void ProcessKernelSVMPointsWithFiltering();
 	void ProcessKernelSVMHistograms();
 	void ProcessDescriptorsSVM();
+	void ProcessSVMClassificationL0();
 	void ProcessMGUASVMClassification(const int iter_num, const int descr_num);
 	void ProcessMGUASVMRegression();
 private:
@@ -44,6 +46,10 @@ private:
 	int m_charges_threshes_num;
 	int m_lennard_jones_threshes_num;
 	int m_areas_threshes_num;
+	bool m_use_levels;
+	bool m_use_triples;
+	int m_pairs_levels_overlap;
+	bool m_write_pairs;
 	MoleculeManager m_molecule_manager;
 	std::vector<double> m_distances;
 	std::vector<double> m_dist_thresholds;
@@ -56,6 +62,10 @@ private:
 	bool m_processed;
 	cv::Mat_<size_t> m_md_matrix;
 	cv::Mat_<double> m_md_matrix_double;
+	cv::Mat_<float> m_md_matrix_float;
+	std::vector<float> m_for_large_matrix;
+	std::vector<float> m_for_large_matrix_1;
+	std::vector<float> m_for_large_matrix_2;
 
 	MGUATrainer<unsigned int> m_mgua_trainer;
 };

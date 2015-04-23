@@ -16,7 +16,7 @@ end
 fclose(fid);
 
 vert_ind = 1;
-fid=fopen(segments_file,'r');
+fid=fopen(types_file,'r');
 input_buf = fscanf(fid,'%*c %f %*s %f %*s %f %*s %d %*s',[1, 4]); 
 fgets(fid);   
 max_segment = 0;

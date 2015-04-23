@@ -13,33 +13,27 @@
 namespace molecule_descriptor
 {
 
-class SingularPointsFinder : public ISingularPointsFinder
+class SngPtsFinderSegmentation : public ISingularPointsFinder
 {
 public:
-	SingularPointsFinder() { }
+	SngPtsFinderSegmentation() { }
 	virtual void Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
-		const bool calc_prop_as_average, const int mesh_levels_num);
-	virtual void GetMarkedSingularPoints(std::vector<MarkedSingularPoint>& marked_singular_points);
+		const bool calc_prop_as_average);
 	virtual void GetNonMarkedSingularPoints(std::pair<std::vector<NonMarkedSingularPoint>, std::vector<size_t>>& non_marked_singular_points);
 	virtual void GetNonMarkedSingularPointsLevels(std::pair<std::vector<std::vector<NonMarkedSingularPoint>>, std::vector<std::vector<size_t>>>& non_marked_singular_points);
-	virtual void GetSingularPointsHisto(std::vector<HistogramSingularPoint<kHistSize>>& singular_points_hist);
-	//TODO: fix compile-time properties num. Maybe put pairs into this class
 	virtual void GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers);
 	virtual void GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types);
-	virtual void Release() { delete this; }
+	virtual void InitParams(int argc, char** argv) {}
 private:
 	Mesh& GetMesh(){ return const_cast<Mesh&>(m_mesh_keeper.GetMesh());/*m_filtered_mesh;*/}
-	const Mesh& GetMesh() const { return const_cast<const SingularPointsFinder*>(this)->GetMesh();}
+	const Mesh& GetMesh() const { return const_cast<const SngPtsFinderSegmentation*>(this)->GetMesh();}
 	void Clear();//call before processing new data
-	void CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges, const Mesh& mesh);
-	void CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const Mesh& mesh);
 	void CalculateVerticesSurfaceType(const Mesh& mesh);
-	void CalculateMaximumsCurvatureLevel(const Mesh& mesh, const int levels_num);
+	void CalculateCurvature(const Mesh& mesh);
 	void SegmentMolecularSurface(const size_t max_segm_size, const Mesh& mesh);
 	void FindSegmentsGraphAndCenters(const Mesh& mesh);
-	void CalculateSingularPointsHistograms();
 	void CalculatePropsInSingPts(const bool calc_prop_as_average);
 	void CalcSegmentsArea(/*const Mesh& mesh*/);
 	void CalcShiftsMaximums();
@@ -49,8 +43,6 @@ private:
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesSegmMap;
 	typedef ContPropMap<VerticesGraph, std::vector<std::map<size_t, uint8_t>>, VERTEX> VetrticesSegmScoreMap;
 	typedef ContPropMap<VerticesGraph, std::vector<Vertice>, VERTEX> FilteredCoordMap;
-	typedef ContPropMap<SingularPointsGraph, 
-	std::vector<std::array<uint8_t, kHistSize>>, VERTEX> SingPtsHistMap;
 
 	typedef ContPropMap<SingularPointsGraph, std::vector<double>, VERTEX> SingPtsDoublePropMap;
 
@@ -62,27 +54,19 @@ private:
 	void CalcPropInSingPts(const GraphPropMap& graph_prop_map, const bool calc_prop_as_average, SingPtsDoublePropMap& sing_pts_prop_map);
 
 	MeshKeeper m_mesh_keeper;
-	Mesh m_filtered_mesh;
-	std::vector<Mesh> m_filtered_mesh_levels;
-	std::vector<Mesh> m_filtered_mesh_levels_2;
-	DoubleVertGraphProp m_curvature_1;
-	DoubleVertGraphProp m_curvature_0;
+	DoubleVertGraphProp m_mean_curvature;
+	DoubleVertGraphProp m_gaussian_curvature;
 
 	std::vector<VertexDescriptor> m_maximums;
-	std::vector<std::vector<VertexDescriptor>> m_maximums_with_levels;
-	//FilteredCoordMap m_filtered_coord;
-	//VetrticesTypeMap m_vertices_type_map;
 	VetrticesChargeMap m_vertex_charge_map;
 	VetrticesChargeMap m_vertex_lennard_jones_map;
 	VetrticesCurvMap m_vertex_curv_type;
-	std::vector<VetrticesCurvMap> m_vertex_curv_type_mesh_levels;
 	VetrticesSegmMap m_vertex_segm;
 	VetrticesSegmScoreMap m_vertex_score_map;
 	TrianglesCurvMap m_triangle_curv_type;
 	TrianglesSegmMap m_triangles_segm;
 	std::array<TrianglesSegmMap, 3>  m_type_triangle_segm;
 	SingularPointsGraph m_singular_points_graph;
-	SingPtsHistMap m_sing_pts_histo;
 	SingPtsDoublePropMap m_sing_pts_potential;
 	SingPtsDoublePropMap m_sing_pts_lennard_jones;
 	SingPtsDoublePropMap m_sing_pts_segm_area;

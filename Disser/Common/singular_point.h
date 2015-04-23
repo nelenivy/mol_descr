@@ -60,6 +60,23 @@ private:
 //mark curvature type
 enum CurvatureTypes {kConvexType = 1, kConcaveType = 2, kSaddleType = 3};
 
+inline CurvatureTypes GetCurvatureType(const double gaussian_curv, const double mean_curv)
+{
+	if (mean_curv > 0.0)
+	{
+		return kConcaveType;
+	}
+	else if (gaussian_curv < 0.0)
+	{
+		return kSaddleType;
+	}
+	else
+	{
+		return kConvexType;
+	}
+}
+
+
 class PropertiesSet
 {
 public:

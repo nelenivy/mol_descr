@@ -11,13 +11,21 @@
 namespace molecule_descriptor
 {
 
-struct CubicCurvature
+//structure for keeping curvature values
+struct Curvature
+{
+	Curvature() :  mean_curv(0), gaussian_curv(0) { }
+	double mean_curv;
+	double gaussian_curv;
+};
+
+struct CubicFittingCurvature
 {
 	static const int kEquationRowLen = 7;
 	static const int kRowsForOneElement = 3;
 };
 
-struct ParabolloidCurvature
+struct ParabolloidFittingCurvature
 {
 	static const int kEquationRowLen = 3;
 	static const int kRowsForOneElement = 1;
@@ -39,12 +47,12 @@ public:
 
 	CurvatureCalculator(const int max_neighbours_num);
 	template <typename CoordMapT>
-	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
+	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Curvature& curvature_matr);
 	template <typename CoordMapT>
-	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Vec2d& curvature_matr);
+	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Curvature& curvature_matr);
 private:
 	template <class CurvatureType, typename CoordMapT>
-	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertices, Vec2d& curvature_matr);
+	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertices, Curvature& curvature_matr);
 	template <class Info3DType, class CurvatureType>
 	void FillEquationMatrices(const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
 	template <class CurvatureType>
@@ -76,14 +84,14 @@ private:
 //};
 
 template<class Info3DType, class NodeType>
-struct CurvatureCalculatorHelper<Info3DType, NodeType, CubicCurvature>
+struct CurvatureCalculatorHelper<Info3DType, NodeType, CubicFittingCurvature>
 {
 	static void FillEquationMatrices(CurvatureCalculator<NodeType>& calculator, const Info3DType& curr_vertex, 
 		const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
 };
 
 template<class Info3DType, class NodeType>
-struct CurvatureCalculatorHelper<Info3DType, NodeType, ParabolloidCurvature>
+struct CurvatureCalculatorHelper<Info3DType, NodeType, ParabolloidFittingCurvature>
 {
 	static void FillEquationMatrices(CurvatureCalculator<NodeType>& calculator, const Info3DType& curr_vertex, 
 		const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
@@ -101,34 +109,36 @@ CurvatureCalculator<NodeType>::CurvatureCalculator(const int max_neighbours_num)
 	m_max_neighbours_num = max_neighbours_num;
 }
 
+//"A Novel Cubic-Order Algorithm for Approximating Principal Direction Vectors"
 template <class GraphType>
 template <typename CoordMapT>
 void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, cv::Vec2d& curvature_matr)
+	const VertexDescr mesh_vertices, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<CubicCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<CubicFittingCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
 }
 
+//"A Comparison of Gaussian and Mean Curvatures Estimation Methods on Triangular Meshes"
 template <class GraphType>
 template <typename CoordMapT>
 void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, cv::Vec2d& curvature_matr)
+	const VertexDescr mesh_vertices, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<ParabolloidCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<ParabolloidFittingCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
 }
 
 template <class GraphType>
 template <class CurvatureType, typename CoordMapT>
 void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, cv::Vec2d& curvature_values)
+	const VertexDescr mesh_vertices, Curvature& curvature_values)
 {
 	typedef boost::graph_traits<GraphType>::adjacency_iterator AdjacencyIter;
 	AdjacencyIter curr_neighbour, last;
 	boost::tie(curr_neighbour, last) = adjacent_vertices(mesh_vertices, graph);
 	if (curr_neighbour == last)
 	{//if there are no neighbours we can't run algorithm
-		curvature_values[0] = 0.0;
-		curvature_values[1] = 0.0;
+		curvature_values.gaussian_curv = 0.0;
+		curvature_values.mean_curv = 0.0;
 		return;
 	}
 
@@ -168,12 +178,12 @@ void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& gra
 	}
 
 	m_ans = m_coefficient_matrix.inv(DECOMP_SVD) * m_z_vect;
-	curvature_values[0] = m_ans(0) * m_ans(2) - m_ans(1) * m_ans(1);
-	curvature_values[1] = m_ans(0) + m_ans(2);
+	curvature_values.gaussian_curv = m_ans(0) * m_ans(2) - m_ans(1) * m_ans(1);
+	curvature_values.mean_curv = m_ans(0) + m_ans(2);
 }
 
 template <class Info3DType, class GraphType>
-void CurvatureCalculatorHelper<Info3DType, GraphType, ParabolloidCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator, 
+void CurvatureCalculatorHelper<Info3DType, GraphType, ParabolloidFittingCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator, 
 	const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect)
 {
 	Point_ToMat_(curr_vertex.Center(), calculator.m_curr_coord);
@@ -193,7 +203,7 @@ void CurvatureCalculatorHelper<Info3DType, GraphType, ParabolloidCurvature>::Fil
 }
 
 template <class Info3DType, class GraphType>
-void CurvatureCalculatorHelper<Info3DType, GraphType, CubicCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator,
+void CurvatureCalculatorHelper<Info3DType, GraphType, CubicFittingCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator,
 	const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect)
 {
 	Point_ToMat_(curr_vertex.Center(), calculator.m_curr_coord);
@@ -219,7 +229,7 @@ void CurvatureCalculatorHelper<Info3DType, GraphType, CubicCurvature>::FillEquat
 	coeff_mat_row[5] = pow(y, 2) * x;
 	coeff_mat_row[6] = pow(y, 3);
 
-	coeff_mat_row += CubicCurvature::kEquationRowLen;
+	coeff_mat_row += CubicFittingCurvature::kEquationRowLen;
 	coeff_mat_row[0] = x;
 	coeff_mat_row[1] = y;
 	coeff_mat_row[2] = 0.0;
@@ -228,7 +238,7 @@ void CurvatureCalculatorHelper<Info3DType, GraphType, CubicCurvature>::FillEquat
 	coeff_mat_row[5] = pow(y, 2);
 	coeff_mat_row[6] = 0.0;
 
-	coeff_mat_row += CubicCurvature::kEquationRowLen;
+	coeff_mat_row += CubicFittingCurvature::kEquationRowLen;
 	coeff_mat_row[0] = 0;
 	coeff_mat_row[1] = x;
 	coeff_mat_row[2] = y;

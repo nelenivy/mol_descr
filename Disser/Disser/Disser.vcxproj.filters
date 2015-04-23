@@ -20,6 +20,12 @@
     <ClCompile Include="SingularPoints\singular_points_finder.cpp">
       <Filter>SingularPoints</Filter>
     </ClCompile>
+    <ClCompile Include="SingularPoints\sng_pts_finder_scale_space.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
+    <ClCompile Include="SingularPoints\sing_pts_finder_creation.cpp">
+      <Filter>SingularPoints</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonUtilities\classic_k_means.h">
@@ -96,6 +102,15 @@
       <Filter>SingularPoints</Filter>
     </ClInclude>
     <ClInclude Include="SingularPoints\points_keeper.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\properties_calculator.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\sng_pts_finder_scale_space.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
+    <ClInclude Include="scale_space_blur.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
   </ItemGroup>

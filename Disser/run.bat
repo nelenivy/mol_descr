@@ -1,2 +1,2 @@
-E:\Disser\mol_descr\Disser\bin\x64_Release\Disser.exe -mol_folder E:\Disser\Tests\glik110 -mol_prefix glik -distances_intervals 10 -distances_intervals_levels 10 -mesh_levels_num 10 -charges_threshes_num 2 -lennard_jones_threshes_num 2 areas_threshes_num 0 -use_levels 1 -calculate_singular_points 1 -mgua_iterations_num 30 -mgua_descriptors_num 15
+E:\Disser\mol_descr\Disser\bin\x64_Release\Disser.exe -mol_folder E:\Disser\Tests\glik110\quantiles_15\ -mol_prefix glik -distances_intervals 10 -distances_intervals_levels 10 -mesh_levels_num 10 -charges_threshes_num 2 -lennard_jones_threshes_num 2 areas_threshes_num 0 -use_levels 1 -calculate_singular_points 0 -mgua_iterations_num 30 -mgua_descriptors_num 15
 pause()

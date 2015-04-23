@@ -43,4 +43,23 @@ ProxyPropMap<PropMap, TransformFunc> GetProxyPropMap(PropMap& prop_map, const Tr
 	return ProxyPropMap<PropMap, TransformFunc>(prop_map, transform_func);
 }
 
+struct IdenticalTransformFunc
+{
+	template <typename T>
+	T& operator ()(T& elem) const
+	{
+		return elem;
+	}
+	template <typename T>
+	const T& operator ()(const T& elem) const
+	{
+		return elem;
+	}
+};
+
+template <class PropMap>
+ProxyPropMap<PropMap, IdenticalTransformFunc> GetPropMapReference(PropMap& prop_map)
+{
+	return ProxyPropMap<PropMap, IdenticalTransformFunc>(prop_map, IdenticalTransformFunc());
+}
 }
