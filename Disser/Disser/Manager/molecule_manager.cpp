@@ -39,6 +39,22 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 		WriteSegmentedSurface();
 		WriteSurfaceWithTypes();
 		WriteSurfaceWithTypesLevels();
+
+		for (int prop_type = ISingularPointsFinder::FIRST_SURF_PROP; prop_type < ISingularPointsFinder::SURF_PROPS_NUM; ++prop_type)
+		{
+			WriteSurfaceWithDblProp(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+		}
+		for (int prop_type = ISingularPointsFinder::FIRST_LOG_PROP; prop_type <= ISingularPointsFinder::LAST_LOG_PROP; ++prop_type)
+		{
+			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+		}
+		for (int prop_type = ISingularPointsFinder::FIRST_PCA_PROP; prop_type <= ISingularPointsFinder::LAST_PCA_PROP; ++prop_type)
+		{
+			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+		}
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_LOG);
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);
 	}
 	else
 	{
@@ -1121,8 +1137,8 @@ void MoleculeManager::CollectProperties(std::vector<std::vector<double>>& props)
 	ReadVector(radius_file_name, wdv_radii);
 
 	m_sing_pts_finder->CalcOnlyProps(vertices, normals, triangles, charges, wdv_radii);
-	props.resize(ISingularPointsFinder::PROPS_NUM);
-	for (int curr_prop = ISingularPointsFinder::FIRST_PROP; curr_prop < ISingularPointsFinder::PROPS_NUM; ++curr_prop)
+	props.resize(ISingularPointsFinder::SURF_PROPS_NUM);
+	for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 	{
 		m_sing_pts_finder->AppendProp(props[curr_prop], static_cast<ISingularPointsFinder::SurfProperty>(curr_prop));
 	}
@@ -1196,6 +1212,30 @@ void MoleculeManager::WriteSurfaceWithTypesLevels()
 		s << lev;
 		const std::string vert_with_types_file = m_curr_file_prefix + Extensions::SurfWithTypesLev() + s.str();
 		WriteInterval(vert_with_types_file, vertices_with_types_lev[lev].begin(), vertices_with_types_lev[lev].end());
+	}	
+}
+
+void MoleculeManager::WriteSurfaceWithDblProp(const ISingularPointsFinder::SurfProperty prop_type)
+{
+	std::vector<std::pair<cv::Point3d, double>> vertices_with_dbl_prop;
+	m_sing_pts_finder->GetVerticesWithDblProp(vertices_with_dbl_prop, prop_type);
+	const std::string vert_with_prop_file = m_curr_file_prefix + 
+		SurfPropertyName(prop_type) + Extensions::SurfWithDblProp();
+	WriteInterval(vert_with_prop_file, vertices_with_dbl_prop.begin(), vertices_with_dbl_prop.end());
+}
+
+void MoleculeManager::WriteSurfaceWithDblPropLevels(const ISingularPointsFinder::SurfProperty prop_type)
+{
+	std::vector<std::vector<std::pair<cv::Point3d, double>>> vertices_with_dbl_prop_lev;
+	m_sing_pts_finder->GetVerticesWithDblPropLevels(vertices_with_dbl_prop_lev, prop_type);
+
+	for (size_t lev = 0; lev < vertices_with_dbl_prop_lev.size(); ++lev)
+	{
+		std::stringstream s;
+		s << lev;
+		const std::string vert_with_prop_file = m_curr_file_prefix + SurfPropertyName(prop_type)+ 
+			Extensions::SurfWithDblPropLev() + s.str();
+		WriteInterval(vert_with_prop_file, vertices_with_dbl_prop_lev[lev].begin(), vertices_with_dbl_prop_lev[lev].end());
 	}	
 }
 

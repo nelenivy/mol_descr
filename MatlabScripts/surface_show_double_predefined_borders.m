@@ -1,4 +1,4 @@
-function  surface_check(triangles_file, segments_file, types_file, centers_file)
+function  surface_show_double_predefined_borders(triangles_file, prop_file, centers_file, double_prop, use_borders, min_val, max_val)
 
 fid=fopen(triangles_file,'r');
 
@@ -16,29 +16,43 @@ end
 fclose(fid);
 
 vert_ind = 1;
-fid=fopen(segments_file,'r');
-input_buf = fscanf(fid,'%*c %f %*s %f %*s %f %*s %d %*s',[1, 4]); 
+fid=fopen(prop_file,'r');
+prop_format = '%*c %f %*s %f %*s %f %*s %d %*s';
+if (double_prop)
+   prop_format = '%*c %f %*s %f %*s %f %*s %f %*s';
+end
+input_buf = fscanf(fid,prop_format,[1, 4]); 
 fgets(fid);   
 max_segment = 0;
-
+min_segment = 100000;
 while(~(isempty(input_buf)))
         vertice_matrix(vert_ind,1) = input_buf(1);
         vertice_matrix(vert_ind,2) = input_buf(2);
         vertice_matrix(vert_ind,3) = input_buf(3);
-        segments_matrix(vert_ind) = input_buf(4);
+        prop_matrix(vert_ind) = input_buf(4);
         
-        if (segments_matrix(vert_ind) > max_segment)
-           max_segment =  segments_matrix(vert_ind);
+        if (prop_matrix(vert_ind) > max_segment)
+           max_segment =  prop_matrix(vert_ind);
         end
         
-        input_buf=fscanf(fid,'%*c %f %*s %f %*s %f %*s %d %*s',[1, 4]); 
+        if (prop_matrix(vert_ind) < min_segment)
+           min_segment =  prop_matrix(vert_ind);
+        end
+        
+        input_buf=fscanf(fid,prop_format,[1, 4]); 
         fgets(fid);
         vert_ind = vert_ind + 1;
 end
 
 fclose(fid);
 max_segment
+min_segment
 
+if (use_borders ~= 1)
+    max_val = max_segment;
+    min_val = min_segment;
+end
+    
 fid=fopen(centers_file,'r');
 
 input_buf = fscanf(fid,'%*c %f %*s %f %*s %f %*s %d %*s',[1, 4]); 
@@ -56,7 +70,7 @@ while(~(isempty(input_buf)))
 end
 fclose(fid);
 
-fid=fopen(types_file,'r');
+fid=fopen(prop_file,'r');
 input_buf=fscanf(fid,'%*c %f %*s %f %*s %f %*s %f %*s',[1, 4]); 
 fgets(fid);   
 type_ind = 1;
@@ -83,15 +97,19 @@ while(~(isempty(input_buf)))
             colour_matrix(type_ind,2) = 1;
             colour_matrix(type_ind,3) = 1;
         else  
+            prop = input_buf(4);
+            if (double_prop == 0)
+               prop = prop / max_segment;
+            else
+                prop = (prop-min_val) / (max_val - min_val);
+                prop = min (prop, 1.0);
+                prop = max (prop, 0.0);
+            end           
             
-            curr_type = fix((input_buf(4) - 1) / 3) + 1
-            curr_type1 = mod(input_buf(4) - 1, 3) + 1;
-            
-            if (curr_type > 3)
-                colour_matrix(type_ind,curr_type) = 0.5;%segments_matrix(type_ind) / max_segment;
-            end
-            colour_matrix(type_ind,curr_type1) = 0.5;%segments_matrix(type_ind) / max_segment;  
-            
+            curr_color = max(ceil(prop * 3.0), 1);
+            color_val = (prop - (curr_color - 1) / 3.0) * 3.0;      
+            color_val = max(color_val, 0.1);
+            colour_matrix(type_ind,curr_color) = color_val;
         end
             
         input_buf=fscanf(fid,'%*c %f %*s %f %*s %f %*s %f %*s',[1, 4]); 

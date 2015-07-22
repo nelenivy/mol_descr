@@ -25,7 +25,7 @@ void MeshKeeper::FillVertices(const vector<cv::Point3d>& vertices, const vector<
 	CV_Assert(vertices.size() == normals.size());
 	//fill vertices
 	m_vertices.resize(vertices.size(), Vertice(cv::Point3d(), cv::Point3d()));
-	auto pmap = get(boost::vertex_info_3d_t(), m_mesh.vertices);
+	auto pmap = get(boost::vertex_info_3d, m_mesh.vertices);
 	for (int ind = 0; ind < m_vertices.size(); ind++)
 	{
 		auto added_vertex = boost::add_vertex(m_mesh.vertices);

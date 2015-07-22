@@ -12,17 +12,17 @@
 namespace molecule_descriptor
 {
 
-template <typename GraphType, typename IndexMap, typename EdgeLengthMap>
+template <typename GraphType, typename IndexMap, typename EdgeLengthMap, typename DistValueType>
 void CalcDistMatr(const GraphType& graph, const IndexMap& index_map, const EdgeLengthMap& edge_length_map, 
-				  const float max_dist_mark, const float no_connection_mark, cv::Mat_<float>& dist_mat);
+				  const DistValueType max_dist_mark, const DistValueType no_connection_mark, cv::Mat_<DistValueType>& dist_mat);
 
-template <typename GraphType>
+template <typename GraphType, typename DistValueType>
 class DijkstraDistMapCalculator
 {
 public:
-	static float kMaxDist() { return 1000000.0f; }
-	static float kNoConnectionMark() { return -1.0f; }
-	void Calc(const GraphType& graph, cv::Mat_<float>& dist_mat)
+	static DistValueType kMaxDist() { return static_cast<DistValueType>(1000000.0); }
+	static DistValueType kNoConnectionMark() { return static_cast<DistValueType>(-1.0); }
+	void Calc(const GraphType& graph, cv::Mat_<DistValueType>& dist_mat)
 	{
 		m_edge_weights.SetGraph(graph);
 		const auto info_3d_map = get(boost::vertex_info_3d, graph);
@@ -41,12 +41,12 @@ public:
 		CalcDistMatr(graph, index_map, m_edge_weights, kMaxDist(), kNoConnectionMark(), dist_mat);
 	}
 private:
-	ContPropMap<GraphType, std::vector<float>, EDGE> m_edge_weights;
+	ContPropMap<GraphType, std::vector<DistValueType>, EDGE> m_edge_weights;
 };
 
-template <typename GraphType, typename IndexMap, typename EdgeLengthMap>
+template <typename GraphType, typename IndexMap, typename EdgeLengthMap, typename ValueType>
 void CalcDistMatr(const GraphType& graph, const IndexMap& index_map, const EdgeLengthMap& edge_length_map, 
-	const float max_dist_mark, const float no_connection_mark, cv::Mat_<float>& dist_mat)
+	const ValueType max_dist_mark, const ValueType no_connection_mark, cv::Mat_<ValueType>& dist_mat)
 {
 	const int graph_size = static_cast<int>(num_vertices(graph));
 	dist_mat.create(graph_size, graph_size);
@@ -60,13 +60,13 @@ void CalcDistMatr(const GraphType& graph, const IndexMap& index_map, const EdgeL
 	{//for each node find shortest distances to other nodes
 		auto distance_queue = MakeRisingProrityQueue(graph_vertices.begin(), graph_vertices.end(), max_dist_mark);
 		const int base_ind = index_map[*node_iter];
-		distance_queue.ChangeKey(base_ind, 0.0f, eThrow);
+		distance_queue.ChangeKey(base_ind, ValueType(0), eThrow);
 
 		while (distance_queue.Size() > 0)
 		{
 			//extract top
 			const vertex_descriptor& curr_top_elem = *(distance_queue.Top().Pointer());
-			float curr_min_dist =  distance_queue.Top().Key();
+			ValueType curr_min_dist =  distance_queue.Top().Key();
 			distance_queue.Pop();
 
 			for (auto neighb_iter = adjacent_vertices(curr_top_elem, graph).first, 

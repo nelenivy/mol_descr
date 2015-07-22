@@ -113,6 +113,15 @@
     <ClInclude Include="scale_space_blur.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
+    <ClInclude Include="mesh_weighted_filter.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\graph_dist_calculate.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="SingularPoints\pca_projections.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

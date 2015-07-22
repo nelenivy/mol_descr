@@ -63,7 +63,7 @@ std::pair<typename boost::graph_traits<boost::subgraph<GraphType>>::vertex_descr
 	}
 	cv::Mat_<float> dist_mat;
 	CalcDistMatr(subgraph, get(boost::vertex_index, subgraph), edge_distances, 
-		std::numeric_limits<float>::max(), 0.0, dist_mat);
+		std::numeric_limits<float>::max(), 0.0f, dist_mat);
 
 	int min_pos = 0;
 	double min_dist = std::numeric_limits<double>::max();

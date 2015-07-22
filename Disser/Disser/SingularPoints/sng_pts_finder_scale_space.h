@@ -32,6 +32,9 @@ public:
 		std::vector<std::vector<size_t>>>& non_marked_singular_points);
 	virtual void GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types);
 	virtual void GetVerticesWithTypesLevels(std::vector<std::vector<std::pair<cv::Point3d, size_t>>>& vertices_with_types);
+	virtual void GetVerticesWithDblProp(std::vector<std::pair<cv::Point3d, double>>& vertices_with_prop, const ISingularPointsFinder::SurfProperty prop_type);
+	virtual void GetVerticesWithDblPropLevels(std::vector<std::vector<std::pair<cv::Point3d, double>>>& vertices_with_props_lev, 
+		const ISingularPointsFinder::SurfProperty prop_type);
 	virtual void AppendProp(std::vector<double>& prop, SurfProperty prop_type)
 	{
 		if (prop_type == ISingularPointsFinder::GAUSS_CURV)
@@ -84,9 +87,6 @@ private:
 	DoubleVertGraphProp m_mean_curvature;
 	DoubleVertGraphProp m_gaussian_curvature;
 
-	std::vector<DoubleVertGraphProp> m_mean_curvature_scales;
-	std::vector<DoubleVertGraphProp> m_gaussian_curvature_scales;
-
 	std::vector<VertexDescriptor> m_maximums;
 	std::vector<std::vector<VertexDescriptor>> m_maximums_with_levels;
 	//FilteredCoordMap m_filtered_coord;
@@ -102,18 +102,31 @@ private:
 	int m_scale_space_levels_num;
 	int m_diff_between_sing_pts_levels_and_scale_space_levels;
 	bool m_detect_blobs;
+	bool m_use_DOG_as_LOG_approximation;
+	bool m_use_euclid_distance;
+	bool m_one_ring_neighb;
 	bool m_combine_channels;
 
-	double m_curv_sigma;
 	double m_init_curv_sigma;
 	double m_sigma_max;
 
 	typedef ProxyPropMap<
 		boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
 	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> m_scale_space_blurrer;
+	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space_diff;
+
 	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space;
+	std::vector<DoubleVertGraphProp> m_input_prop_map;
 
-
+	struct PCAProjecter
+	{
+		cv::PCA pca;
+		cv::Mat_<double> vect_to_project_on;
+	};
+	typedef ContPropMap<VerticesGraph, std::vector<PCAProjecter>, VERTEX> PCAProjecterMap;
+	std::vector<DoubleVertGraphProp> m_detector_function_projected;
+	std::vector<DoubleVertGraphProp> m_scale_space_projected;
+	std::vector<std::vector<DoubleVertGraphProp>> m_projecters_coords;
 };
 
 }

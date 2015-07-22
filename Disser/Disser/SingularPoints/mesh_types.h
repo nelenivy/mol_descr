@@ -69,41 +69,84 @@ inline bool operator!=(const Vertice& vert_1, const Vertice& vert_2)
 }
 
 template <typename VertexDescriptor, class Graph>
-struct Triangle
+class Triangle
 {
+public:
 	Triangle() : a(VertexDescriptor()), b(VertexDescriptor()), 
 		c(VertexDescriptor()), m_graph(nullptr) { }
 	Triangle(const VertexDescriptor vert_1, 
 		const VertexDescriptor vert_2, const VertexDescriptor vert_3, Graph& graph)
-		: a(vert_1), b(vert_2), c(vert_3), m_graph(&graph) { }
+		: a(vert_1), b(vert_2), c(vert_3), m_graph(&graph) 
+	{
+		SetVerticesAndGraph(vert_1, vert_2, vert_3, graph);
+	}
 
-	Triangle(VertexDescriptor vertices_in[3])
-		: a(vertices_in[0]), b(vertices_in[1]), c(vertices_in[2]) { }
-	cv::Point3d Center() const { 
+	void SetVerticesAndGraph(const VertexDescriptor vert_1, 
+		const VertexDescriptor vert_2, const VertexDescriptor vert_3, Graph& graph)
+	{
+		a = vert_1;
+		b = vert_2;
+		c = vert_3;
+		m_graph = &graph;
+		RecalculateProperties();
+	}
+	void RecalculateProperties()
+	{
+		CalcCenter();
+		CalcNormal();
+		CalcArea();
+	}
+	double Area() const {
+		return area;
+	}
+	const cv::Point3d& Normal() const { 
+		return normal;
+	}
+	const cv::Point3d& Center() const {
+		return center;
+	}
+	const VertexDescriptor& GetA() const
+	{
+		return a;
+	}
+	const VertexDescriptor& GetB() const
+	{
+		return b;
+	}
+	const VertexDescriptor& GetC() const
+	{
+		return c;
+	}
+private:
+	void CalcCenter() { 
 		const auto pmap = get(boost::vertex_info_3d, *m_graph);
 		cv::Point3d tr_cent = pmap[a].Center() + pmap[b].Center() + pmap[c].Center();
 		tr_cent *= 1.0 / 3.0;
-		return tr_cent;
+		center = tr_cent;
 	}
 
-	cv::Point3d Normal() const { 
+	void CalcNormal() { 
 		const auto pmap =  get(boost::vertex_info_3d, *m_graph);
-		cv::Point3d tr_normal = pmap[a].Norm() + pmap[b].Norm() + pmap[c].Norm();
+		cv::Point3d tr_normal = pmap[a].Normal() + pmap[b].Normal() + pmap[c].Normal();
 		tr_normal.x *= 1.0 / 3.0;
-		return tr_normal;
+		normal = tr_normal;
 	}
-	double Area() const {
+	void CalcArea() 
+	{
 		const auto pmap = get(boost::vertex_info_3d, *m_graph);
 		const double side_a = cv::norm(pmap[a].Center() - pmap[b].Center());
 		const double side_b = cv::norm(pmap[a].Center() - pmap[c].Center());
 		const double side_c = cv::norm(pmap[b].Center() - pmap[c].Center());
 		const double half_perim = (side_a + side_b + side_c) / 2.0;
-		const double area = sqrt(half_perim * (half_perim - side_a) * (half_perim - side_b) * (half_perim - side_c));
-		return area;
+		area = sqrt(half_perim * (half_perim - side_a) * (half_perim - side_b) * (half_perim - side_c));
 	}
 	VertexDescriptor a;
 	VertexDescriptor b;
 	VertexDescriptor c;
+	cv::Point3d normal;
+	cv::Point3d center;
+	double area;
+
 	Graph* m_graph;
 };
 
@@ -125,8 +168,8 @@ int CountSameVertices(const Triangle<VertexDescriptor, Graph>& triangle_1,
 {
 	int same_vertices = 0;
 
-	VertexDescriptor vertices_1[] = {triangle_1.a, triangle_1.b, triangle_1.c};
-	VertexDescriptor vertices_2[] = {triangle_2.a, triangle_2.b, triangle_2.c};
+	VertexDescriptor vertices_1[] = {triangle_1.GetA(), triangle_1.GetB(), triangle_1.GetC()};
+	VertexDescriptor vertices_2[] = {triangle_2.GetA(), triangle_2.GetB(), triangle_2.GetC()};
 
 	for (int vert_1_ind = 0; vert_1_ind < 3; vert_1_ind++)
 	{
@@ -169,6 +212,15 @@ struct Mesh
 {
 	VerticesGraph vertices;
 	TrianglesGraph triangles;
+};
+
+template <>
+struct GetCoord<MeshTriangle>
+{
+	const cv::Point3d& operator()(const MeshTriangle& vert) const 
+	{
+		return vert.Center();
+	} 
 };
 
 }

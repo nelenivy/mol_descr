@@ -141,6 +141,8 @@ private:
 	void WriteTriangles(const std::vector<cv::Point3i>& triangles);
 	void WriteSurfaceWithTypes();
 	void WriteSurfaceWithTypesLevels();
+	void WriteSurfaceWithDblPropLevels(const ISingularPointsFinder::SurfProperty prop_type);
+	void WriteSurfaceWithDblProp(const ISingularPointsFinder::SurfProperty prop_type);
 	void ReadSingularPointsLevelsTypes(const int levels_num);
 	void ReadSingularPointsLevelsLabels(const int levels_num);
 private:

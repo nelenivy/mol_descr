@@ -6,6 +6,7 @@
 #include "opencv2/core/core_c.h"
 #include "SingularPoints/mesh_types.h"
 #include "SingularPoints\mesh_operations.h"
+#include "SingularPoints\pca_projections.h"
 #include "GraphLib\connected_components_segmentator.h"
 #include "GraphLib\graph_operations.h"
 #include "GraphLib\graph_filter.h"
@@ -27,20 +28,22 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 {
 	ReadParamFromCommandLineWithDefault(argc, argv, "-mesh_levels_num", m_sing_pts_levels_num, 10);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-detect_blobs", m_detect_blobs, true);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-use_DOG_as_LOG_approximation", m_use_DOG_as_LOG_approximation, true);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-use_euclid_distance", m_use_euclid_distance, false);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-combine_channels", m_combine_channels, true);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-one_ring_neighb", m_one_ring_neighb, true);
 
-	ReadParamFromCommandLineWithDefault(argc, argv, "-curv_sigma", m_curv_sigma, 0.2);
-	ReadParamFromCommandLineWithDefault(argc, argv, "-init_curv_sigma", m_init_curv_sigma, 0.3);
-	ReadParamFromCommandLineWithDefault(argc, argv, "-sigma_max", m_sigma_max, 2.65);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-init_curv_sigma", m_init_curv_sigma, 0.33);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-sigma_max", m_sigma_max, 2.89);
 
 	m_scale_space_levels_num = m_sing_pts_levels_num + (m_detect_blobs ? 3 : 2);
 	m_diff_between_sing_pts_levels_and_scale_space_levels = 1;
 
 	//INIT SCALE-SPACE
 	const bool kAdditive = false;
-	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_scale_space_levels_num));
+	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
 	std::cout << "d_mult_sigma " << d_mult_sigma << std::endl;
-	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, kAdditive);
+	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive);
 }
 
 void SngPtsFinderScaleSpace::CalcOnlyProps(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
@@ -108,10 +111,12 @@ void SngPtsFinderScaleSpace::GetNonMarkedSingularPointsLevels(std::pair<std::vec
 			curr_point.Property().SurfaceType() = m_vertex_curv_type_mesh_levels[level
  + m_diff_between_sing_pts_levels_and_scale_space_levels][curr_descr];
 			curr_point.Property().Charge() = Sign(m_vertex_charge_map[curr_descr]);
-			curr_point.Property().ElectricPotential() = m_output_scale_space[level][ELECTR_POTENT][curr_descr]
+			curr_point.Property().ElectricPotential() = m_output_scale_space[
+				level+ m_diff_between_sing_pts_levels_and_scale_space_levels][ELECTR_POTENT][curr_descr]
 			* m_mean_and_sigma[ELECTR_POTENT][1]+ m_mean_and_sigma[ELECTR_POTENT][0] - 3 * m_mean_and_sigma[ELECTR_POTENT][1];
 			
-			curr_point.Property().LennardJones() = m_output_scale_space[level][STERIC_POTENT][curr_descr]
+			curr_point.Property().LennardJones() = m_output_scale_space[
+				level+ m_diff_between_sing_pts_levels_and_scale_space_levels][STERIC_POTENT][curr_descr]
 			* m_mean_and_sigma[STERIC_POTENT][1]+ m_mean_and_sigma[STERIC_POTENT][0] - 3 * m_mean_and_sigma[STERIC_POTENT][1];;//m_vertex_lennard_jones_map[curr_descr];
 			curr_point.Property().Area() = 0;
 			curr_point.Coord() = get(boost::vertex_info_3d, vertices_graph, curr_descr).Center();
@@ -138,7 +143,55 @@ void SngPtsFinderScaleSpace::GetNonMarkedSingularPoints(std::pair<std::vector<No
 		curr_point.Coord() = get(boost::vertex_info_3d, vertices_graph, curr_descr).Center();
 	}
 }
+void SngPtsFinderScaleSpace::GetVerticesWithDblProp(std::vector<std::pair<cv::Point3d, double>>& vertices_with_prop, 
+	const ISingularPointsFinder::SurfProperty prop_type)
+{
+	const VerticesGraph& vertices_graph = GetMesh().vertices;
+	vertices_with_prop.clear();
+	vertices_with_prop.reserve(num_vertices(vertices_graph));
 
+	const DoubleVertGraphProp& prop_map = /*(prop_type <= ISingularPointsFinder::SURF_PROPS_NUM) ? */
+		m_input_prop_map[prop_type]; 
+	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+		curr_vertice != end_vertices; ++curr_vertice)
+	{
+		const double curr_prop = prop_map[*curr_vertice];
+		const cv::Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *curr_vertice).Center();
+		vertices_with_prop.push_back(std::make_pair(curr_coord, curr_prop));
+	}
+}
+
+void SngPtsFinderScaleSpace::GetVerticesWithDblPropLevels(std::vector<std::vector<std::pair<cv::Point3d, double>>>& vertices_with_props_lev, 
+	const ISingularPointsFinder::SurfProperty prop_type)
+{
+	const VerticesGraph& vertices_graph = GetMesh().vertices;
+	vertices_with_props_lev.clear();
+	vertices_with_props_lev.resize(m_sing_pts_levels_num);
+
+	for (size_t lev = 0; lev < m_sing_pts_levels_num; ++lev)
+	{
+		vertices_with_props_lev[lev].reserve(num_vertices(vertices_graph));
+		const DoubleVertGraphProp& prop_map = (prop_type <= ISingularPointsFinder::SURF_PROPS_NUM) ? 
+			m_output_scale_space[lev + m_diff_between_sing_pts_levels_and_scale_space_levels][prop_type] :
+		(prop_type >= ISingularPointsFinder::FIRST_LOG_PROP && prop_type <= ISingularPointsFinder::LAST_LOG_PROP ? 
+			m_output_scale_space_diff[lev + m_diff_between_sing_pts_levels_and_scale_space_levels]
+		[prop_type - ISingularPointsFinder::SURF_PROPS_NUM - 1] : 
+		(prop_type >= ISingularPointsFinder::FIRST_PCA_PROP && prop_type <= ISingularPointsFinder::LAST_PCA_PROP ?
+			m_projecters_coords[lev + m_diff_between_sing_pts_levels_and_scale_space_levels]
+		[prop_type - ISingularPointsFinder::FIRST_PCA_PROP] : 
+			(prop_type == ISingularPointsFinder::PCA_LOG ? 
+				m_detector_function_projected[lev + m_diff_between_sing_pts_levels_and_scale_space_levels] :
+			m_scale_space_projected[lev + m_diff_between_sing_pts_levels_and_scale_space_levels])));
+
+		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			const double curr_prop = prop_map[*curr_vertice];
+			const cv::Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *curr_vertice).Center();
+			vertices_with_props_lev[lev].push_back(std::make_pair(curr_coord, curr_prop));
+		}
+	}
+}
 void SngPtsFinderScaleSpace::GetVerticesWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types)
 {
 	const VerticesGraph& vertices_graph = GetMesh().vertices;
@@ -158,16 +211,17 @@ void SngPtsFinderScaleSpace::GetVerticesWithTypesLevels(std::vector<std::vector<
 {
 	const VerticesGraph& vertices_graph = GetMesh().vertices;
 	vertices_with_types_lev.clear();
-	vertices_with_types_lev.resize(m_vertex_curv_type_mesh_levels.size() - 2);
+	vertices_with_types_lev.resize(m_sing_pts_levels_num);
 
-	for (size_t lev = 0; lev < vertices_with_types_lev.size() - 2; ++lev)
+	for (size_t lev = 0; lev < m_sing_pts_levels_num; ++lev)
 	{
 		vertices_with_types_lev[lev].reserve(num_vertices(vertices_graph));
 
 		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 			curr_vertice != end_vertices; ++curr_vertice)
 		{
-			const size_t curr_curv_type = m_vertex_curv_type_mesh_levels[lev + 1][*curr_vertice];
+			const size_t curr_curv_type = m_vertex_curv_type_mesh_levels[lev + 
+				m_diff_between_sing_pts_levels_and_scale_space_levels][*curr_vertice];
 			const cv::Point3d curr_coord = get(boost::vertex_info_3d, vertices_graph, *curr_vertice).Center();
 			vertices_with_types_lev[lev].push_back(std::make_pair(curr_coord, curr_curv_type));
 		}
@@ -235,139 +289,6 @@ void SngPtsFinderScaleSpace::CalcShiftsMaximums()
 	}
 }
 
-
-
-void SngPtsFinderScaleSpace::CalculateVerticesSurfaceType(const Mesh& mesh)
-{
-	
-	//std::vector<DoubleVertGraphProp> filtered_gaussian_curvatures(kCurvLevels, DoubleVertGraphProp(vertices_graph));
-	//std::vector<DoubleVertGraphProp> filtered_mean_curvatures(kCurvLevels, DoubleVertGraphProp(vertices_graph));
-
-	//m_mean_curvature.SetGraph(vertices_graph);
-	//m_gaussian_curvature.SetGraph(vertices_graph);
-	//const int kMaxNeighbNum = 10;
-	//CurvatureCalculator<VerticesGraph> curvature_calculator(kMaxNeighbNum);
-	////typedef GaussianKernel<cv::Point3d, double> KernelType;
-	//const size_t kMedRad = 5;
-	//DoubleVertGraphProp gauss_curv_temp(vertices_graph);
-	//DoubleVertGraphProp mean_curv_temp(vertices_graph);
-
-	//PointsKeeper<VerticesGraph> points_keeper(1.0, vertices_graph);
-	//m_maximums.clear();
-	//m_maximums_with_levels.clear();
-	//m_vertex_curv_type_mesh_levels.assign(m_filtered_mesh_levels.size(), VetrticesCurvMap(vertices_graph));
-
-	//for (size_t mesh_level = 0; mesh_level < m_filtered_mesh_levels.size(); ++mesh_level)
-	//{
-	//	std::cout << "mesh lev " << mesh_level << "\n";
-	//	const VerticesGraph& curr_mesh_level = m_filtered_mesh_levels[mesh_level].vertices;
-	//	for (auto curr_vertice = vertices(curr_mesh_level).first, end_vertices = vertices(curr_mesh_level).second; 
-	//		curr_vertice != end_vertices; ++curr_vertice)
-	//	{
-	//		Curvature curvatures;
-	//		curvature_calculator.CalculateCurvatureCubic(curr_mesh_level, get(boost::vertex_info_3d, curr_mesh_level), *curr_vertice, curvatures);
-	//		m_gaussian_curvature[*curr_vertice] = curvatures.gaussian_curv;
-	//		m_mean_curvature[*curr_vertice] = curvatures.mean_curv;
-
-	//	}
-	//	typedef MedianKernel<double, size_t> KernelType1;
-	//	FilterGraphEdgeDist(KernelType1(1), curr_mesh_level, m_gaussian_curvature, gauss_curv_temp);
-	//	FilterGraphEdgeDist(KernelType1(1), curr_mesh_level, m_mean_curvature, mean_curv_temp);
-	//	DoubleVertGraphProp gauss_curv_temp_1(curr_mesh_level);
-	//	DoubleVertGraphProp mean_curv_temp_1(curr_mesh_level);
-
-	//	for (size_t curr_level = 0; curr_level < kCurvLevels; ++curr_level)
-	//	{
-	//		typedef GaussianKernel<cv::Point3d, double> KernelType;
-	//		FilterGraphDist(KernelType(curr_level * 0.2 + 0.4), curr_mesh_level/*vertices_graph*/, GetProxyPropMap(get(boost::vertex_info_3d, curr_mesh_level/*vertices_graph*/), GetCoord<Vertice>()), 
-	//			/*m_curvature_0*/ gauss_curv_temp, gauss_curv_temp_1/*filtered_curvatures_0[curr_level]*/);///////////
-	//		FilterGraphDist(KernelType(curr_level * 0.2 + 0.4), curr_mesh_level/*vertices_graph*/, GetProxyPropMap(get(boost::vertex_info_3d, curr_mesh_level/*vertices_graph*/), GetCoord<Vertice>()),
-	//			/*m_curvature_1*/ mean_curv_temp, mean_curv_temp_1/*filtered_curvatures_1[curr_level]*/);	
-	//		FilterGraphEdgeDist(KernelType1(1), curr_mesh_level/*vertices_graph*/, gauss_curv_temp_1, filtered_gaussian_curvatures[curr_level]/*, temp0*/);
-	//		FilterGraphEdgeDist(KernelType1(1), curr_mesh_level/*vertices_graph*/, mean_curv_temp_1, filtered_mean_curvatures[curr_level]/*, temp1*/);
-
-	//		if (curr_level == 0)
-	//		{
-	//			for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
-	//				curr_vertice != end_vertices; ++curr_vertice)
-	//			{
-	//				m_vertex_curv_type_mesh_levels[mesh_level][*curr_vertice] = GetCurvatureType(
-	//					filtered_gaussian_curvatures[curr_level][*curr_vertice], filtered_mean_curvatures[curr_level][*curr_vertice]);
-	//			}
-	//		}
-	//	
-	//	}
-	//	//m_curvature_1 = filtered_curvatures_1[0];
-	//	//m_curvature_0 = filtered_curvatures_2[0];
-	//	PointsKeeper<VerticesGraph> points_keeper_mesh_level(1.0 * sqrt(mesh_level + 1.0), vertices_graph);
-
-	//	for (size_t curr_level = 0; curr_level < filtered_gaussian_curvatures.size(); ++curr_level)
-	//	{
-	//		std::vector<VertexDescriptor> gauss_curv_maximums, mean_curv_maximums;
-	//		FindLocalMaximumsOfAbsVal(curr_mesh_level/*vertices_graph*/, filtered_gaussian_curvatures[curr_level], gauss_curv_maximums, std::greater<double>());
-	//		FindLocalMaximumsOfAbsVal(curr_mesh_level/*vertices_graph*/, filtered_mean_curvatures[curr_level], mean_curv_maximums, std::greater<double>());
-	//		PointsKeeper<VerticesGraph> points_keeper_level(1.0, vertices_graph);
-	//		points_keeper_level.AddPoints(gauss_curv_maximums, m_vertex_curv_type_mesh_levels[mesh_level]);
-	//		points_keeper_level.AddPoints(mean_curv_maximums, m_vertex_curv_type_mesh_levels[mesh_level]);
-	//		points_keeper_mesh_level.AddPoints(points_keeper_level.Points(), m_vertex_curv_type_mesh_levels[mesh_level]);
-	//		//m_maximums_with_levels[curr_level] = points_keeper_level.Points();
-	//		std::cout << gauss_curv_maximums.size() << " " << mean_curv_maximums.size() << "\n";
-	//		points_keeper.AddPoints(gauss_curv_maximums, m_vertex_curv_type_mesh_levels[mesh_level]);
-	//		points_keeper.AddPoints(mean_curv_maximums, m_vertex_curv_type_mesh_levels[mesh_level]);
-	//		//m_maximums.insert(m_maximums.end(), maximums_0.begin(), maximums_0.end());
-	//		//m_maximums.insert(m_maximums.end(), maximums_1.begin(), maximums_1.end());
-	//	}
-	//	m_maximums_with_levels.push_back(points_keeper_mesh_level.Points());
-	//	std::cout << m_maximums_with_levels.back().size() << "\n";
-	//}
-	///*for (size_t curr_level = 0; curr_level < filtered_curvatures_0.size(); ++curr_level)
-	//{
-	//	PointsKeeper<VerticesGraph> points_keeper_level(0.5, vertices_graph);
-	//	for (size_t next_levels = curr_level; next_levels < filtered_curvatures_0.size(); ++next_levels)
-	//	{
-	//		points_keeper_level.AddPoints(m_maximums_with_levels[next_levels]);
-	//	}
-	//	m_maximums_with_levels[curr_level] = points_keeper_level.Points();
-	//}*/
-	//m_maximums = points_keeper.Points();
-	/*std::vector<DoubleVertGraphProp> diff_0(filtered_curvatures_0.size() - 1, DoubleVertGraphProp(vertices_graph));
-	std::vector<DoubleVertGraphProp> diff_1(filtered_curvatures_1.size() - 1, DoubleVertGraphProp(vertices_graph));
-
-	for (size_t curr_level = 0; curr_level < filtered_curvatures_0.size() - 1; ++curr_level)
-	{
-		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
-			curr_vertice != end_vertices; ++curr_vertice)
-		{
-			diff_0[curr_level][*curr_vertice] = abs( filtered_curvatures_0[curr_level + 1][*curr_vertice]  - 
-				filtered_curvatures_0[curr_level][*curr_vertice] ) / (filtered_curvatures_0[curr_level][*curr_vertice] + 0.001);
-			diff_1[curr_level][*curr_vertice] = abs( filtered_curvatures_1[curr_level + 1][*curr_vertice]  -
-				filtered_curvatures_1[curr_level][*curr_vertice] ) / (filtered_curvatures_1[curr_level][*curr_vertice] + 0.001);		
-		}
-	}
-	FindLocalMaximumsOnLevels(vertices_graph, diff_0, m_maximums);
-	std::vector<VertexDescriptor> maximums_1;
-	FindLocalMaximumsOnLevels(vertices_graph, diff_1, maximums_1);
-	m_maximums.insert(m_maximums.end(), maximums_1.begin(), maximums_1.end());*/
-	std::cout << "maximums " << m_maximums.size() << " ";
-	//filter curvature
-
-	//ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_1(vertices_graph);
-	//ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_0(vertices_graph);
-	/*typedef MedianKernel<double, size_t> KernelType;
-	const size_t kMedRad = 1;
-	FilterGraphEdgeDist(KernelType(kMedRad), vertices_graph, m_curvature_1, filtered_curvature_1);
-	FilterGraphEdgeDist(KernelType(kMedRad), vertices_graph, m_curvature_0, filtered_curvature_0);*/
-	//m_curvature_1 = filtered_curvature_1;
-	//m_curvature_0 = filtered_curvature_0;
-	/*typedef GaussianKernel<cv::Point3d, double> KernelType; 
-
-	GraphDistFilter<VerticesGraph, ProxyCoordMapGraph, GaussianKernel<cv::Point3d, double>> gauss_filter_1(GaussianKernel<cv::Point3d, double>(0.5));
-	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_1(vertices_graph);
-	ContPropMap<VerticesGraph, std::vector<double>, VERTEX> filtered_curvature_0(vertices_graph);
-	gauss_filter_1.Filter(vertices_graph, map_3d_coord, curvature_1, filtered_curvature_1);
-	gauss_filter_1.Filter(vertices_graph, map_3d_coord, curvature_0, filtered_curvature_0);*/
-}
-
 void SngPtsFinderScaleSpace::CalcCurvature(const Mesh& mesh)
 {
 	const VerticesGraph& vertices_graph = mesh.vertices;
@@ -394,20 +315,43 @@ void SngPtsFinderScaleSpace::CalcCurvature(const Mesh& mesh)
 	}
 }
 
+
 void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 {
-	const VerticesGraph& vertices_graph = mesh.vertices;	
+	const VerticesGraph& vertices_graph = mesh.vertices;
 
 	//DATA PREPARATION
-	std::vector<DoubleVertGraphProp> input_prop_map(ISingularPointsFinder::PROPS_NUM);
-	input_prop_map[ISingularPointsFinder::GAUSS_CURV] = m_gaussian_curvature;
-	input_prop_map[ISingularPointsFinder::MEAN_CURV] = m_mean_curvature;
-	input_prop_map[ISingularPointsFinder::ELECTR_POTENT] = m_vertex_charge_map;
-	input_prop_map[ISingularPointsFinder::STERIC_POTENT] = m_vertex_lennard_jones_map;
+	m_input_prop_map.resize(ISingularPointsFinder::SURF_PROPS_NUM);
+	m_input_prop_map[ISingularPointsFinder::GAUSS_CURV] = m_gaussian_curvature;
+	m_input_prop_map[ISingularPointsFinder::MEAN_CURV] = m_mean_curvature;
+	m_input_prop_map[ISingularPointsFinder::ELECTR_POTENT] = m_vertex_charge_map;
+	m_input_prop_map[ISingularPointsFinder::STERIC_POTENT] = m_vertex_lennard_jones_map;
 
+	double mean_dist = 0.0;
+	double edges_num = 0.0;
+	std::vector<double> edges_lengths;
+	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+		curr_vertice != end_vertices; ++curr_vertice)
+	{
+		boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
+			get(boost::vertex_info_3d, vertices_graph);
+		CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+
+		for (auto curr_neighb = adjacent_vertices(*curr_vertice, vertices_graph).first, 
+			end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second; 
+			curr_neighb != end_neighb; ++curr_neighb)
+		{
+			const double curr_dist = cv::norm(coord_map[*curr_vertice] - coord_map[*curr_neighb]);
+			edges_lengths.push_back(curr_dist);
+			mean_dist += curr_dist;
+			++edges_num;
+		}
+	}	
+	std::nth_element(edges_lengths.begin(), edges_lengths.begin() + Round(0.9 * edges_lengths.size()), edges_lengths.end());
+	std::cout << mean_dist / edges_num << " " << edges_lengths[Round(0.9 * edges_lengths.size())] << "\n";
 	if (!m_mean_and_sigma.empty())
 	{//rescale functions
-		for (int curr_prop = ISingularPointsFinder::FIRST_PROP; curr_prop < ISingularPointsFinder::PROPS_NUM; ++ curr_prop)
+		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++ curr_prop)
 		{
 			const double min_val = m_mean_and_sigma[curr_prop][0] - 3.0 * m_mean_and_sigma[curr_prop][1];
 			const double max_val = m_mean_and_sigma[curr_prop][0] + 3.0 * m_mean_and_sigma[curr_prop][1];
@@ -415,10 +359,10 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 			for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 				curr_vertice != end_vertices; ++curr_vertice)
 			{
-				input_prop_map[curr_prop][*curr_vertice] = std::min(input_prop_map[curr_prop][*curr_vertice], max_val);
-				input_prop_map[curr_prop][*curr_vertice] = std::max(input_prop_map[curr_prop][*curr_vertice], min_val);
-				input_prop_map[curr_prop][*curr_vertice] -= min_val;
-				input_prop_map[curr_prop][*curr_vertice] /= m_mean_and_sigma[curr_prop][1];
+				m_input_prop_map[curr_prop][*curr_vertice] = std::min(m_input_prop_map[curr_prop][*curr_vertice], max_val);
+				m_input_prop_map[curr_prop][*curr_vertice] = std::max(m_input_prop_map[curr_prop][*curr_vertice], min_val);
+				m_input_prop_map[curr_prop][*curr_vertice] -= min_val;
+				m_input_prop_map[curr_prop][*curr_vertice] /= m_mean_and_sigma[curr_prop][1];
 			}
 		}
 	}
@@ -426,9 +370,47 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
 		get(boost::vertex_info_3d, vertices_graph);
 	CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+
+	const TrianglesGraph& triangles_graph = mesh.triangles;
+	boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map_tr = 
+		get(boost::vertex_info_3d, triangles_graph);
+	const auto coord_map_tr = GetProxyPropMap(coord_3d_map_tr, GetCoord<MeshTriangle>());
+	//calculate distances
+	cv::Mat_<double> vert_vert_dist(num_vertices(vertices_graph), num_vertices(vertices_graph));
+	cv::Mat_<double> vert_tr_dist(num_vertices(vertices_graph), num_vertices(triangles_graph));
+
+	if (m_use_euclid_distance)
+	{
+		CalcDistBetweenGraphs(vertices_graph, coord_map, vertices_graph, coord_map, vert_vert_dist);
+		CalcDistBetweenGraphs(vertices_graph, coord_map, triangles_graph, coord_map_tr, vert_tr_dist);
+	}
+	else
+	{//USE GEODESIC DISTANCE
+		DijkstraDistMapCalculator<VerticesGraph, double> djikstra_dist;
+		djikstra_dist.Calc(vertices_graph, vert_vert_dist);
+
+		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			for (auto curr_tr = vertices(triangles_graph).first, end_tr = vertices(triangles_graph).second; 
+				curr_tr != end_tr; ++curr_tr)
+			{
+				vert_tr_dist(*curr_vertice, *curr_tr) = (vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetA()) + 
+					vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetB()) + 
+					vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetC())) / 3.0;
+			}
+		}
+	}
+
+	double min_val = 0, max_val = 0;
+	cv::minMaxLoc(vert_vert_dist, &min_val, &max_val);
+	std::cout << min_val << " " << max_val << "\n";
+	cv::minMaxLoc(vert_tr_dist, &min_val, &max_val);
+	std::cout << min_val << " " << max_val << "\n";
+	
 	//MAKE SCALE-SPACE
 	const bool use_post_filter = !m_detect_blobs;
-	m_scale_space_blurrer.MakeScaleSpace(vertices_graph, coord_map, input_prop_map, 
+	m_scale_space_blurrer.MakeScaleSpace(vertices_graph, vert_vert_dist, triangles_graph, vert_tr_dist, m_input_prop_map, 
 		m_scale_space_levels_num, use_post_filter, m_output_scale_space);
 
 	//DETECT TYPES OF VERTICES FOR EACH LEVEL, ACCORDING TO THE CURVATURE	
@@ -446,94 +428,228 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 				m_mean_and_sigma[MEAN_CURV][0] - 3 * m_mean_and_sigma[MEAN_CURV][1]);
 		}	
 	}	
-	//CALCULATE MEAN IN NEIGHB
-	std::vector<std::vector<DoubleVertGraphProp>> scale_space_vect_to_project(m_scale_space_levels_num);
-
-	struct DataFiller
-	{
-		void operator()(const CoordMap& coord, const double coord_scale, 
-			const std::vector<DoubleVertGraphProp>& props, const double props_scale,
-			const VertexDescriptor curr_vert, const int data_row, Mat_<double>& data) const
-		{
-			data(data_row, 0) = coord_scale * coord[curr_vert].x;
-			data(data_row, 1) = coord_scale * coord[curr_vert].y;
-			data(data_row, 2) = coord_scale * coord[curr_vert].z;
-
-			for (int col = 3; col < 3 + PROPS_NUM; ++col)
-			{
-				data(data_row, col) = props_scale * props[col - 3][curr_vert];
-			}
-		}
-	};
-	for (size_t curr_level = 0; curr_level < m_scale_space_levels_num; ++curr_level)
-	{
-		scale_space_vect_to_project[curr_level].resize(m_output_scale_space[curr_level].size());
-		for (size_t curr_prop = 0; curr_prop < m_output_scale_space[curr_level].size(); ++curr_prop)
-		{
-			scale_space_vect_to_project[curr_level][curr_prop].SetGraph(vertices_graph);
-		}
-
-		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
-			curr_vertice != end_vertices; ++curr_vertice)
-		{
-			bool success = false;
-			const int neighb_num = adjacent_vertices(*curr_vertice, vertices_graph).second - adjacent_vertices(*curr_vertice, vertices_graph).first;
-			cv::Mat_<double> data(neighb_num + 1, 3 + PROPS_NUM);
-			DataFiller()(coord_map, 1.0, m_output_scale_space[curr_level], 1.0, *curr_vertice, 0, data);
-
-			for (auto neighb_it = adjacent_vertices(*curr_vertice, vertices_graph).first,
-				end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second; neighb_it != end_neighb; ++neighb_it)
-			{
-				DataFiller()(coord_map, 1.0, m_output_scale_space[curr_level], 1.0, *neighb_it, end_neighb - neighb_it, data);
-			}
-				
-			cv::PCA pca(data, cv::noArray(), CV_PCA_DATA_AS_ROW, 4);
-			cv::Mat_<double> data_basis(1, 3 + PROPS_NUM), proj_basis;
-			DataFiller()(coord_map, 1.0, m_output_scale_space[curr_level], 0.0, *curr_vertice, 0, data_basis);
-			cv::Mat_<double> curr_data(1, 3 + PROPS_NUM), proj_curr;
-			DataFiller()(coord_map, 1.0, m_output_scale_space[curr_level], 1.0, *curr_vertice, 0, curr_data);
-			pca.project(data_basis, proj_basis);
-			pca.project(curr_data, proj_curr);
-			cv::Mat_<double> vect_to_project;
-			pca.backProject(proj_curr - proj_basis, vect_to_project);
-
-			for (int prop = 0; prop < PROPS_NUM; ++prop)
-			{
-				scale_space_vect_to_project[curr_level][prop][*curr_vertice] = vect_to_project(0, prop + 3);
-			}
-		}
-	}
 	//DETECT FEATURES
+	std::vector<PCAProjecterMap> scale_space_projecter(m_scale_space_levels_num);
+
 	if (m_detect_blobs)
 	{
-		std::vector<std::vector<DoubleVertGraphProp>> output_scale_space_diff(m_scale_space_levels_num - 1);
+		m_output_scale_space_diff.clear();
+		m_output_scale_space_diff.resize(m_scale_space_levels_num - 1);
 
-		for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
+		if (m_use_DOG_as_LOG_approximation)
 		{
-			const double coeff = (m_scale_space_blurrer.GetSigma(curr_level + 1) + m_scale_space_blurrer.GetSigma(curr_level)) / 2.0 
-				/ (m_scale_space_blurrer.GetSigma(curr_level + 1) - m_scale_space_blurrer.GetSigma(curr_level));
-
-			output_scale_space_diff[curr_level].resize(m_output_scale_space[curr_level].size());
-
-			for (size_t curr_prop = 0; curr_prop < output_scale_space_diff[curr_level].size(); ++curr_prop)
+			ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> scale_space_blurrer_shifted;//for calculation of derivative in t
+			const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
+			scale_space_blurrer_shifted.Init(m_init_curv_sigma, d_mult_sigma, 0.1, false);
+			std::vector<std::vector<DoubleVertGraphProp>> output_scale_space_shifted;
+			scale_space_blurrer_shifted.MakeScaleSpace(vertices_graph, vert_vert_dist, triangles_graph, vert_tr_dist, m_input_prop_map, 
+				m_scale_space_levels_num, use_post_filter, output_scale_space_shifted);
+			//Calculate scales difference which approximates laplace operator
+			for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
 			{
-				output_scale_space_diff[curr_level][curr_prop].SetGraph(vertices_graph);
+				const double coeff = (scale_space_blurrer_shifted.GetSigma(curr_level) + m_scale_space_blurrer.GetSigma(curr_level)) / 2.0 
+					/ (scale_space_blurrer_shifted.GetSigma(curr_level) - m_scale_space_blurrer.GetSigma(curr_level));
+
+				m_output_scale_space_diff[curr_level].resize(m_output_scale_space[curr_level].size());
+				const auto& shifted_scale_space_lev = /*m_output_scale_space[curr_level + 1]*/output_scale_space_shifted[curr_level];
+				for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+				{
+					m_output_scale_space_diff[curr_level][curr_prop].SetGraph(vertices_graph);
+					for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+						curr_vertice != end_vertices; ++curr_vertice)
+					{
+						m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] = coeff * 				 
+							(shifted_scale_space_lev[curr_prop][*curr_vertice] - m_output_scale_space[curr_level][curr_prop][*curr_vertice]);
+
+					}	
+				}
+			}
+		}
+		else
+		{
+			for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
+			{
+				const double coeff = m_scale_space_blurrer.GetSigma(curr_level);
+				m_output_scale_space_diff[curr_level].resize(m_output_scale_space[curr_level].size());
+
+				for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+				{
+					m_output_scale_space_diff[curr_level][curr_prop].SetGraph(vertices_graph);
+					/*SimpleLaplacian(vertices_graph, m_output_scale_space[curr_level][curr_prop], 
+						output_scale_space_diff[curr_level][curr_prop]);*/
+				}
+
+				//LaplaceBeltramiKernelWeightedDist<double, SignedDistFunc<double>> kernel(0.5/*(m_scale_space_blurrer.GetSigma(curr_level) + 1.7) / 4.0*//*0.3*/, SignedDistFunc<double>());
+				LoGKernelWeightedDist<double> kernel(m_scale_space_blurrer.GetSigma(curr_level));
+				FilterMeshWeightedFunc(vertices_graph, triangles_graph, 
+					vert_vert_dist, vert_tr_dist, m_input_prop_map, true,
+					kernel, m_output_scale_space_diff[curr_level]);
+				/*FilterMeshWeightedFunc(vertices_graph, triangles_graph, 
+				vert_vert_dist, vert_tr_dist, m_output_scale_space[curr_level], false,
+				kernel, output_scale_space_diff[curr_level]);*/
+					
+				for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+				{
+					for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+						curr_vertice != end_vertices; ++curr_vertice)
+					{
+						m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] = m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] * coeff;
+					}	
+				}
+			}
+
+			for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[0].size(); ++curr_prop)
+			{
 				for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 					curr_vertice != end_vertices; ++curr_vertice)
 				{
-					output_scale_space_diff[curr_level][curr_prop][*curr_vertice] = coeff * 				 
-						(m_output_scale_space[curr_level + 1][curr_prop][*curr_vertice] - m_output_scale_space[curr_level][curr_prop][*curr_vertice]);
-
+					for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
+					{
+						//std::cout << output_scale_space_diff[curr_level][curr_prop][*curr_vertice] << " ";
+					}
+					//std::cout << "\n";
 				}	
 			}
 		}
+		//END LOG CALCULATION
 
+		//recalculate scales values as it is between scale
+		/*for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
+		{
+			for (size_t curr_prop = 0; curr_prop < output_scale_space_diff[curr_level].size(); ++curr_prop)
+			{
+				for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+					curr_vertice != end_vertices; ++curr_vertice)
+				{
+					m_output_scale_space[curr_level][curr_prop][*curr_vertice] = 0.5 *				 
+						(m_output_scale_space[curr_level + 1][curr_prop][*curr_vertice] + 
+						m_output_scale_space[curr_level][curr_prop][*curr_vertice]);
+
+				}	
+			}
+		}*/
+		//CALCULATE MEAN IN NEIGHB
+		scale_space_projecter.resize(m_output_scale_space.size());
+		for (int lev = 0; lev < m_output_scale_space.size(); ++lev)
+		{
+			scale_space_projecter[lev].SetGraph(vertices_graph);
+			FindVectorsForProjection(vertices_graph, coord_map, m_output_scale_space[lev], 
+				vert_vert_dist, 2.0 * m_scale_space_blurrer.GetSigma(lev), scale_space_projecter[lev]);
+		}
+		//CALCULATE PROJECTED VECTORS
+		m_detector_function_projected.clear();
+		m_detector_function_projected.resize(m_output_scale_space_diff.size());
+		m_scale_space_projected.clear();
+		m_scale_space_projected.resize(m_output_scale_space_diff.size());
+		m_projecters_coords.clear();
+		m_projecters_coords.resize(m_output_scale_space_diff.size());
+
+		for (int lev = 0; lev < m_output_scale_space_diff.size(); ++lev)
+		{
+			m_detector_function_projected[lev].SetGraph(vertices_graph);
+			m_scale_space_projected[lev].SetGraph(vertices_graph);
+			const size_t kPcaPropsNum = ISingularPointsFinder::LAST_PCA_PROP - ISingularPointsFinder::FIRST_PCA_PROP + 1;
+			m_projecters_coords[lev].resize(kPcaPropsNum);
+			for (size_t prop_num = 0; prop_num < kPcaPropsNum; ++prop_num)
+			{
+				m_projecters_coords[lev][prop_num].SetGraph(vertices_graph);
+			}
+			for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+				curr_vertice != end_vertices; ++curr_vertice)
+			{
+				m_detector_function_projected[lev][*curr_vertice] = 
+					ProjectPCADiff(m_output_scale_space_diff[lev], coord_map, scale_space_projecter[lev], *curr_vertice);
+				m_scale_space_projected[lev][*curr_vertice] = 
+					ProjectPCA(m_output_scale_space[lev], coord_map, scale_space_projecter[lev], *curr_vertice);
+
+				for (size_t prop_num = 0; prop_num < kPcaPropsNum; ++prop_num)
+				{
+					m_projecters_coords[lev][prop_num][*curr_vertice]
+						= std::abs(scale_space_projecter[lev][*curr_vertice].pca.eigenvectors.at<double>(3, 3 + prop_num));
+				}
+			}			
+		}
+		//////////////////////////////////////////////////////////////////////////
+		//DETECT POINTS
 		m_maximums_with_levels.clear();
 
 		if (m_combine_channels)
 		{
-			FindLocalMaximumsOnLevelsVect(vertices_graph, output_scale_space_diff, scale_space_vect_to_project/*output_scale_space*/,  
-				m_maximums_with_levels, std::greater<double>(), std::less<double>(), true);
+			std::vector<DoubleVertGraphProp> gaussian_curvature_scales_diff(m_scale_space_levels_num - 1, DoubleVertGraphProp(vertices_graph));
+			std::vector<std::vector<VertexDescriptor>> maximums_gauss(m_scale_space_levels_num);
+			m_maximums_with_levels.resize(m_scale_space_levels_num);
+			for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
+			{
+				gaussian_curvature_scales_diff[curr_level] = m_output_scale_space_diff[curr_level][STERIC_POTENT];
+			
+				FindLocalMaximumsOfAbsVal(vertices_graph, m_output_scale_space[curr_level][STERIC_POTENT], maximums_gauss[curr_level], 
+						std::greater<double>(), std::less<double>());	
+				/*FindLocalMaximumsOfAbsVal(vertices_graph, gaussian_curvature_scales_diff[curr_level], m_maximums_with_levels[curr_level], 
+					std::greater<double>(), std::less<double>());*/	
+			}
+
+			m_vertex_curv_type_mesh_levels.resize(m_scale_space_levels_num - 1);
+		/*	FindLocalMaximumsOnLevels(vertices_graph, gaussian_curvature_scales_diff, m_maximums_with_levels, 
+				std::greater<double>(), std::less<double>(), m_one_ring_neighb);*/
+			m_maximums_with_levels.clear();
+			FindLocalMaximumsOnLevelsVect(vertices_graph,coord_map, m_output_scale_space_diff, scale_space_projecter/*output_scale_space*/,  
+				m_maximums_with_levels, std::greater<double>(), std::less<double>(), true, m_one_ring_neighb);
+			for (size_t curr_level = 0; curr_level < m_maximums_with_levels.size(); ++curr_level)
+			{
+				std::cout << m_maximums_with_levels[curr_level].size() << " ";
+			}
+			std::cout << "\n";
+			for (size_t curr_level = 0; curr_level < m_maximums_with_levels.size(); ++curr_level)
+			{
+				std::vector<VertexDescriptor> with_max;
+				std::cout << maximums_gauss[curr_level + 1].size() << " ";
+
+				for (int ind1 = 0; ind1 < m_maximums_with_levels[curr_level].size();++ind1)
+				{
+					bool is_near = false;
+					VertexDescriptor matched_point;
+					if (std::find(maximums_gauss[curr_level + 1].begin(), maximums_gauss[curr_level + 1].end(), m_maximums_with_levels[curr_level][ind1]) 
+						!= maximums_gauss[curr_level + 1].end())
+					{
+						is_near = true;
+						matched_point = m_maximums_with_levels[curr_level][ind1];
+					}	
+					else
+					{
+						for (auto neighb_it = adjacent_vertices(m_maximums_with_levels[curr_level][ind1], vertices_graph).first,
+							end_neighb = adjacent_vertices(m_maximums_with_levels[curr_level][ind1], vertices_graph).second; 
+							neighb_it != end_neighb; ++neighb_it)
+						{
+							if (std::find(maximums_gauss[curr_level + 1].begin(), maximums_gauss[curr_level + 1].end(), *neighb_it) 
+								!= maximums_gauss[curr_level + 1].end())
+							{
+								is_near = true;
+								matched_point = *neighb_it;
+							}	
+						}
+					}
+
+					if (is_near)
+					{
+						with_max.push_back(matched_point);
+					}
+				}
+
+				std::sort(with_max.begin(), with_max.end());
+				with_max.erase(std::unique(with_max.begin(), with_max.end()), with_max.end());
+				//m_maximums_with_levels[curr_level] = with_max;
+				/*m_maximums_with_levels[curr_level].insert(m_maximums_with_levels[curr_level].end(), 
+					maximums_gauss[curr_level].begin(), maximums_gauss[curr_level].end());*/
+			}
+			std::cout << "\n";
+
+			m_maximums_with_levels.resize(m_sing_pts_levels_num);
+			for (size_t curr_level = 1; curr_level < m_maximums_with_levels.size(); ++curr_level)
+			{
+				m_maximums_with_levels[0].insert(m_maximums_with_levels[0].end(), 
+					m_maximums_with_levels[curr_level].begin(), m_maximums_with_levels[curr_level].end());
+			}
+			
 		}
 		else
 		{
@@ -544,22 +660,17 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 
 			for (size_t curr_level = 0; curr_level < m_scale_space_levels_num - 1; ++curr_level)
 			{
-				gaussian_curvature_scales_diff[curr_level] = output_scale_space_diff[curr_level][GAUSS_CURV];
-				mean_curvature_scales_diff[curr_level] = output_scale_space_diff[curr_level][MEAN_CURV];
-				electrostatic_scale_space_diff[curr_level] = output_scale_space_diff[curr_level][ELECTR_POTENT];
-				steric_scale_space_diff[curr_level] = output_scale_space_diff[curr_level][STERIC_POTENT];
+				gaussian_curvature_scales_diff[curr_level] = m_output_scale_space_diff[curr_level][GAUSS_CURV];
+				mean_curvature_scales_diff[curr_level] = m_output_scale_space_diff[curr_level][MEAN_CURV];
+				electrostatic_scale_space_diff[curr_level] = m_output_scale_space_diff[curr_level][ELECTR_POTENT];
+				steric_scale_space_diff[curr_level] = m_output_scale_space_diff[curr_level][STERIC_POTENT];
 			}
 			m_vertex_curv_type_mesh_levels.resize(m_scale_space_levels_num - 1);
 			std::vector<std::vector<VertexDescriptor>> sing_pts_gaussian, sing_pts_mean, sing_pts_electric, sing_pts_steric;
-			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, gaussian_curvature_scales_diff, 
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_gaussian, true, false);
-			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, mean_curvature_scales_diff, 
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_mean, true, false);
-
-			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, electrostatic_scale_space_diff, 
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_electric, true, false);
-			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, steric_scale_space_diff, 
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_steric, true, false);
+			FindLocalMaximumsOnLevels(vertices_graph, gaussian_curvature_scales_diff, sing_pts_gaussian, std::greater<double>(), std::less<double>(), m_one_ring_neighb);
+			FindLocalMaximumsOnLevels(vertices_graph, mean_curvature_scales_diff, sing_pts_mean, std::greater<double>(), std::less<double>(), m_one_ring_neighb);
+			FindLocalMaximumsOnLevels(vertices_graph, electrostatic_scale_space_diff, sing_pts_electric, std::greater<double>(), std::less<double>(), m_one_ring_neighb);
+			FindLocalMaximumsOnLevels(vertices_graph, steric_scale_space_diff, sing_pts_steric, std::greater<double>(), std::less<double>(), m_one_ring_neighb);
 
 			for (size_t curr_level = 0; curr_level < m_sing_pts_levels_num; ++curr_level)
 			{
@@ -582,6 +693,14 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 	{
 		m_maximums_with_levels.clear();
 
+		scale_space_projecter.resize(m_output_scale_space.size());
+		for (int lev = 0; lev < m_output_scale_space.size(); ++lev)
+		{
+			scale_space_projecter[lev].SetGraph(vertices_graph);
+			FindVectorsForProjection(vertices_graph, coord_map, m_output_scale_space[lev], 
+				vert_vert_dist, 2.0 * m_scale_space_blurrer.GetSigma(lev), scale_space_projecter[lev]);
+		}
+
 		if (m_combine_channels)
 		{
 			std::vector<DoubleVertGraphProp> scale_space_projected(m_scale_space_levels_num);
@@ -595,20 +714,20 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 				{
 					scale_space_projected[curr_level][*curr_vertice] = 0.0;
 					double norm = 0;
-					for (int prop = 0; prop < PROPS_NUM; ++prop)
+					for (int prop = 0; prop < SURF_PROPS_NUM; ++prop)
 					{
 						scale_space_projected[curr_level][*curr_vertice] += 
 							m_output_scale_space[curr_level][prop][*curr_vertice];
 							///*scale_space_vect_to_project*/m_output_scale_space[curr_level][prop][*curr_vertice];
-						norm += scale_space_vect_to_project[curr_level][prop][*curr_vertice] * 
-							scale_space_vect_to_project[curr_level][prop][*curr_vertice];
+						/*norm += scale_space_vect_to_project[curr_level][prop][*curr_vertice] * 
+							scale_space_vect_to_project[curr_level][prop][*curr_vertice];*/
 					}
 					//scale_space_projected[curr_level][*curr_vertice] /= sqrt(norm);
 				}
 			}
 
 			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, scale_space_projected,
-				m_vertex_curv_type_mesh_levels, 1.0, m_maximums_with_levels, false, true);
+				m_vertex_curv_type_mesh_levels, 1.0, m_maximums_with_levels, true);
 			m_maximums_with_levels.resize(m_sing_pts_levels_num);
 		}
 		else
@@ -628,13 +747,13 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales(const Mesh& mesh)
 
 			std::vector<std::vector<VertexDescriptor>> sing_pts_gaussian, sing_pts_mean, sing_pts_electric, sing_pts_steric;
 			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, gaussian_curvature_scales,
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_gaussian, false, true);
+				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_gaussian, true);
 			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, mean_curvature_scales,
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_mean, false, true);
+				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_mean, true);
 			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, electrostatic_scale_space,
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_electric, false, true);
+				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_electric, true);
 			FindScaleSingularPointsOnFunc(vertices_graph, coord_map, steric_scale_space,
-				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_steric, false, true);
+				m_vertex_curv_type_mesh_levels, 1.0, sing_pts_steric, true);
 
 			for (size_t curr_level = 0; curr_level < m_sing_pts_levels_num; ++curr_level)
 			{

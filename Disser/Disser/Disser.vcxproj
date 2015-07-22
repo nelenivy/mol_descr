@@ -174,6 +174,7 @@
     <ClInclude Include="GraphLib\connected_components_segmentator.h" />
     <ClInclude Include="GraphLib\curvature_calculator.h" />
     <ClInclude Include="GraphLib\dijkstra_dist_matr.h" />
+    <ClInclude Include="GraphLib\graph_dist_calculate.h" />
     <ClInclude Include="GraphLib\graph_filter.h" />
     <ClInclude Include="GraphLib\graph_functions.h" />
     <ClInclude Include="GraphLib\graph_operations.h" />
@@ -185,8 +186,10 @@
     <ClInclude Include="Manager\molecule_manager.h" />
     <ClInclude Include="Manager\set_manager.h" />
     <ClInclude Include="Manager\types_calculation.h" />
+    <ClInclude Include="mesh_weighted_filter.h" />
     <ClInclude Include="scale_space_blur.h" />
     <ClInclude Include="SingularPoints\i_singular_points_finder.h" />
+    <ClInclude Include="SingularPoints\pca_projections.h" />
     <ClInclude Include="SingularPoints\points_keeper.h" />
     <ClInclude Include="SingularPoints\mesh_constructor.h" />
     <ClInclude Include="SingularPoints\mesh_operations.h" />

@@ -222,9 +222,9 @@ void SngPtsFinderSegmentation::CalculateCurvature(const Mesh& mesh)
 	{
 		const MeshTriangle curr_triangle = get(boost::vertex_info_3d, triangles_graph, *curr_tr_iter);
 		int8_t types[kSaddleType+1] = {};
-		types[m_vertex_curv_type[curr_triangle.a]]++;
-		types[m_vertex_curv_type[curr_triangle.b]]++;
-		types[m_vertex_curv_type[curr_triangle.c]]++;
+		types[m_vertex_curv_type[curr_triangle.GetA()]]++;
+		types[m_vertex_curv_type[curr_triangle.GetB()]]++;
+		types[m_vertex_curv_type[curr_triangle.GetC()]]++;
 
 		int max_count = -1;
 		int max_type = -1;
@@ -361,9 +361,9 @@ void SngPtsFinderSegmentation::SegmentMolecularSurface(const size_t max_segm_siz
 	{
 		const MeshTriangle& curr_triangle = get(boost::vertex_info_3d, triangles_graph, *tr_iter);
 		const size_t curr_segm = m_triangles_segm[*tr_iter];
-		m_vertex_score_map[curr_triangle.a][curr_segm]++;
-		m_vertex_score_map[curr_triangle.b][curr_segm]++;
-		m_vertex_score_map[curr_triangle.c][curr_segm]++;
+		m_vertex_score_map[curr_triangle.GetA()][curr_segm]++;
+		m_vertex_score_map[curr_triangle.GetB()][curr_segm]++;
+		m_vertex_score_map[curr_triangle.GetC()][curr_segm]++;
 	}
 	//write values to the vertices segments map
 	for (auto vert_iter = vertices(vertices_graph).first, end_iter = vertices(vertices_graph).second; 

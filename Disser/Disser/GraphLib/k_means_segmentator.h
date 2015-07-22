@@ -24,7 +24,7 @@ private:
 	template <typename IndexMap>
 	void KMeansImpl(const GraphType& graph, const IndexMap& index_map, const size_t clust_num);
 
-	DijkstraDistMapCalculator<GraphType> m_dist_mat_calculator;
+	DijkstraDistMapCalculator<GraphType, float> m_dist_mat_calculator;
 	cv::Mat_<float> m_distance_mat;
 	ContPropMap<GraphType, vector<bool>, VERTEX> m_visited;
 	ContPropMap<GraphType, vector<bool>, VERTEX> m_curr_subgraph_mask;
@@ -159,7 +159,7 @@ void KMeansSegmentator<GraphType>::KMeansImpl(const GraphType& graph, const Inde
 				continue;
 			}
 
-			float min_dist = DijkstraDistMapCalculator<GraphType>::kMaxDist();
+			float min_dist = DijkstraDistMapCalculator<GraphType, float>::kMaxDist();
 
 			for (size_t curr_clust = 1; curr_clust <= clust_num; ++curr_clust)
 			{
@@ -197,7 +197,7 @@ void KMeansSegmentator<GraphType>::KMeansImpl(const GraphType& graph, const Inde
 
 		//find the nearest point from the set to the actual center
 		std::fill(min_dist_to_center.begin(), min_dist_to_center.end(), 
-			make_pair(static_cast<float>(DijkstraDistMapCalculator<GraphType>::kMaxDist()), 0));
+			make_pair(static_cast<float>(DijkstraDistMapCalculator<GraphType, float>::kMaxDist()), 0));
 
 		for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; 
 			curr_vert != end_vert; ++curr_vert)

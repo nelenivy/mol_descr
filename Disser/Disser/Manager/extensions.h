@@ -17,6 +17,8 @@ struct Extensions
 	static const char* SegmSurf() { return ".sgm";}
 	static const char* SurfWithTypes() { return ".tps";}
 	static const char* SurfWithTypesLev() { return ".tps_lev"; }
+	static const char* SurfWithDblProp() { return ".dbl";}
+	static const char* SurfWithDblPropLev() { return ".dbl_lev"; }
 	static const char* Pairs() { return ".prs";}
 	static const char* PairsLevels() { return ".prs_lev";}
 	static const char* Triples() { return ".trps";}

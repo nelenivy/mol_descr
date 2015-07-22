@@ -371,4 +371,20 @@ private:
 	MaskType m_mask;
 	ConnectedComponentsSegmentator<GraphType, CoordMap, MaskType, double, DistFunc<CoordType>> m_segmentator;
 };
+
+template <class Graph, class PropMapIn, class PropMapOut>
+void SimpleLaplacian(const Graph& graph, const PropMapIn& prop_map_in, PropMapOut& prop_map_out)
+{
+	for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second;
+		curr_vert != end_vert; ++curr_vert)
+	{
+		for (auto neighb_it = adjacent_vertices(*curr_vert, graph).first,
+			end_neighb = adjacent_vertices(*curr_vert, graph).second; neighb_it != end_neighb; ++neighb_it)
+		{
+			prop_map_out[*curr_vert] = prop_map_in[*curr_vert] - prop_map_in[*neighb_it];
+		}
+
+		prop_map_out[*curr_vert] /= static_cast<double>(std::distance(vertices(graph).first, vertices(graph).second));
+	}
+}
 }

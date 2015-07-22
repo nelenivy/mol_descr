@@ -35,6 +35,10 @@ const bool kNotCalculate = false;
 
 void SetManager::Init(int argc, char** argv)
 {
+	for (int ind = 1; ind < argc; ++ind)
+	{
+		m_command_line += argv[ind];
+	}
 	ReadParamsFromCommandLine(argc, argv);
 	FindOutMoleculesNum();
 	m_molecule_manager.SetLevelsNum(m_mesh_levels_num);
@@ -759,7 +763,7 @@ void SetManager::ProcessSVMClassificationL0()
 
 		std::ofstream f(m_mol_folder + m_mol_prefix + "_descr_set1.txt", std::ofstream::app);
 		f << "======================================\n";
-
+		f << m_command_line << std::endl;
 			f << "descr = ";
 			for (size_t descr_pos = 0; descr_pos < weights.size(); ++descr_pos)
 			{

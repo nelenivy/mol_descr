@@ -68,6 +68,8 @@ private:
 	std::vector<float> m_for_large_matrix_2;
 
 	MGUATrainer<unsigned int> m_mgua_trainer;
+
+	std::string m_command_line;
 };
 
 }
