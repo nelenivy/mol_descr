@@ -7,6 +7,7 @@
 #include "opencv2/core/core.hpp"
 #include "../Common/singular_point.h"
 #include "GraphLib/array_property_map.h"
+#include "GraphLib\proxy_property_map.h"
 #include "mesh_constructor.h"
 #include "mesh_types.h"
 
@@ -37,6 +38,9 @@ private:
 	void CalculatePropsInSingPts(const bool calc_prop_as_average);
 	void CalcSegmentsArea(/*const Mesh& mesh*/);
 	void CalcShiftsMaximums();
+	void CalculateDistanceMaps(const Mesh& mesh);
+	void CalcTangentBasis(const Mesh& mesh);
+
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesTypeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> VetrticesCurvMap;
@@ -70,6 +74,16 @@ private:
 	SingPtsDoublePropMap m_sing_pts_potential;
 	SingPtsDoublePropMap m_sing_pts_lennard_jones;
 	SingPtsDoublePropMap m_sing_pts_segm_area;
+
+	//distance maps
+	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
+	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
+
+	cv::Mat_<double> m_vert_vert_dist;
+	cv::Mat_<double> m_vert_tr_dist;
+	typedef ContPropMap<VerticesGraph, std::vector<cv::Mat_<double>>, VERTEX> TangentBasisMap;
+	TangentBasisMap m_tangent_basis_map;
+
 };
 
 }

@@ -63,13 +63,19 @@ public:
 		
 		if (post_filter) 
 		{
-			m_filtered_before_postproc.assign(prop_map_vect.size(), DoubleVertGraphProp(vertices_graph));
+			m_filtered_before_postproc.resize(levels_num);
 		}
-		for (size_t curr_level = 0; curr_level < levels_num; ++curr_level)
+#pragma omp parallel for
+		for (int curr_level = 0; curr_level < levels_num; ++curr_level)
 		{
+			if (post_filter) 
+			{
+				m_filtered_before_postproc[curr_level].assign(prop_map_vect.size(), DoubleVertGraphProp(vertices_graph));
+			}
 			const double curr_sigma = GetSigma(curr_level);
 			//ConvolutionKernel av_kernel(curr_sigma);
-			std::vector<DoubleVertGraphProp>& filtered_output = post_filter ? m_filtered_before_postproc : filtered_prop_map_vect[curr_level];
+			std::vector<DoubleVertGraphProp>& filtered_output = post_filter ? 
+				m_filtered_before_postproc[curr_level] : filtered_prop_map_vect[curr_level];
 			GaussianKernelWeightedDist<double> av_kernel(curr_sigma);
 			//GaussianKernelWeightedDistTable<double> av_kernel(curr_sigma, m_exp_approx);
 			FilterMeshWeightedFunc(vertices_graph, tr_graph, vert_vert_dist, vert_tr_dist, prop_map_vect, true, 
@@ -112,7 +118,7 @@ private:
 	double m_offset;
 	bool m_additive;//true - additive, false - multiplicative
 	AverageFinder<VerticesGraph, CoordMapT> m_av_finder;
-	std::vector<DoubleVertGraphProp> m_filtered_before_postproc;
+	std::vector<std::vector<DoubleVertGraphProp>> m_filtered_before_postproc;
 	std::shared_ptr<ExpApproxForGauss> m_exp_approx;
 
 };
@@ -132,7 +138,7 @@ void FindScaleSingularPointsOnFunc(const VerticesGraph& vertices_graph, const Co
 	
 	for (size_t curr_level = 0; curr_level < levels_num; ++curr_level)
 	{
-		FindLocalMaximumsOfAbsVal(vertices_graph, scales_prop_map[curr_level], sing_pts_extended[curr_level], 
+		FindLocalMaxAndMin(vertices_graph, scales_prop_map[curr_level], sing_pts_extended[curr_level], 
 			std::greater<double>(), std::less<double>());
 	}	
 

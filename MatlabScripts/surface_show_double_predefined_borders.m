@@ -104,12 +104,16 @@ while(~(isempty(input_buf)))
                 prop = (prop-min_val) / (max_val - min_val);
                 prop = min (prop, 1.0);
                 prop = max (prop, 0.0);
-            end           
-            
-            curr_color = max(ceil(prop * 3.0), 1);
-            color_val = (prop - (curr_color - 1) / 3.0) * 3.0;      
-            color_val = max(color_val, 0.1);
-            colour_matrix(type_ind,curr_color) = color_val;
+            end  
+            prop = prop * (255.0 - 85.0) + 85.0;
+            [R, G, B] = HSVToRGB(prop, 240, 240);
+            %curr_color = max(ceil(prop * 3.0), 1);
+            %color_val = (prop - (curr_color - 1) / 3.0) * 3.0;      
+            %color_val = max(color_val, 0.1);
+            %colour_matrix(type_ind,curr_color) = color_val;
+            colour_matrix(type_ind,1)=R;
+            colour_matrix(type_ind,2)=G;
+            colour_matrix(type_ind,3)=B;
         end
             
         input_buf=fscanf(fid,'%*c %f %*s %f %*s %f %*s %f %*s',[1, 4]); 

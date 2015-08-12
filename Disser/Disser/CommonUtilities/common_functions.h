@@ -5,6 +5,12 @@ namespace molecule_descriptor
 {
 
 template <typename T>
+T Sqr(const T num)
+{
+	return num * num;
+}
+
+template <typename T>
 int Round(T num)
 {
 	return num > static_cast<T>(0) ? static_cast<int>(num + static_cast<T>(0.5)) : static_cast<int>(num - static_cast<T>(0.5));

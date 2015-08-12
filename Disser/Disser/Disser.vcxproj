@@ -172,8 +172,10 @@
     <ClInclude Include="CommonUtilities\priority_heap.h" />
     <ClInclude Include="GraphLib\array_property_map.h" />
     <ClInclude Include="GraphLib\connected_components_segmentator.h" />
+    <ClInclude Include="GraphLib\coordinates_transform.h" />
     <ClInclude Include="GraphLib\curvature_calculator.h" />
     <ClInclude Include="GraphLib\dijkstra_dist_matr.h" />
+    <ClInclude Include="GraphLib\gradient_calculator.h" />
     <ClInclude Include="GraphLib\graph_dist_calculate.h" />
     <ClInclude Include="GraphLib\graph_filter.h" />
     <ClInclude Include="GraphLib\graph_functions.h" />

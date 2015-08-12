@@ -101,7 +101,15 @@ void SetManager::ProcessSingularPoints(const bool calculate)
 		{
 			std::cout << ind << "\n";
 			m_molecule_manager.SetCurrFilePrefix(MakeMoleculePrefix(ind));
-			m_molecule_manager.CollectProperties(props);			
+			m_molecule_manager.CollectProperties(props);	
+
+			if (ind == 0)
+			{
+				for (size_t prop_ind = 0; prop_ind < props.size(); ++prop_ind)
+				{
+					props[prop_ind].reserve(props[prop_ind].size() * m_molecules_num);
+				}
+			}
 		}
 		std::vector<std::vector<double>> prop_params(props.size());
 		for (size_t ind = 0; ind < props.size(); ++ind)

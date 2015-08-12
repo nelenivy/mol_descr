@@ -33,46 +33,26 @@ void FindVectorsForProjection(const Graph& vertices_graph, const CoordMap& coord
 		}
 	};
 
-	typedef ContPropMap<Graph, std::vector<uint8_t>, VERTEX> VerticesMask;
-	VerticesMask vertices_to_process(vertices_graph);
+	std::vector<VertexDescriptor> vertices_withit_dist;
 	scale_space_projecter.SetGraph(vertices_graph);
-	vertices_to_process.Clear();
 		
 	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
 		curr_vertice != end_vertices; ++curr_vertice)
 	{
 		//find vertices that we need to process
-		size_t vert_num_in_mask = 0;
-		for (auto neighb_vertice = vertices(vertices_graph).first, end_neighb_vertices = vertices(vertices_graph).second; 
-			neighb_vertice != end_neighb_vertices; ++neighb_vertice)
-		{
-
-			if (dist_vert_map(*curr_vertice, *neighb_vertice) <= dist_thresh)
-			{
-				vertices_to_process[*neighb_vertice] = 255;
-				++vert_num_in_mask;
-			}
-			else
-			{
-				vertices_to_process[*neighb_vertice] = 0;
-			}
-		}
+		GetVerticesWithinDistPlusAdjacent(*curr_vertice, vertices_graph, dist_vert_map, dist_thresh, vertices_withit_dist);
 		//fill data
 		const double kCoordMult = 1000.0;
 		const double kPropMult = 1.0;
-		cv::Mat_<double> data(vert_num_in_mask, 3 + ISingularPointsFinder::SURF_PROPS_NUM);
-		vert_num_in_mask = 0;
-		for (auto neighb_vertice = vertices(vertices_graph).first, end_neighb_vertices = vertices(vertices_graph).second; 
+		cv::Mat_<double> data(vertices_withit_dist.size(), 3 + ISingularPointsFinder::SURF_PROPS_NUM);
+		size_t curr_vert_in_mask = 0;
+		for (auto neighb_vertice = vertices_withit_dist.begin(), end_neighb_vertices =  vertices_withit_dist.end(); 
 			neighb_vertice != end_neighb_vertices; ++neighb_vertice)
 		{
-			if (vertices_to_process[*neighb_vertice])
-			{
-				DataFiller()(coord_map, kCoordMult, scale_space, kPropMult, 
-					*neighb_vertice, vert_num_in_mask, data);
-				++vert_num_in_mask;
-			}
+			DataFiller()(coord_map, kCoordMult, scale_space, kPropMult, 
+				*neighb_vertice, curr_vert_in_mask, data);
+			++curr_vert_in_mask;
 		}	
-		std::cout << vert_num_in_mask << " ";
 		//calculate coordiantes
 		cv::PCA pca(data, cv::Mat()/*data.row(0)*/, CV_PCA_DATA_AS_ROW, 4);
 		//find images of coordiante vectors basis

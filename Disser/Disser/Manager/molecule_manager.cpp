@@ -53,8 +53,15 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 		{
 			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
 		}
+		for (int prop_type = ISingularPointsFinder::FIRST_EIG_PROP; prop_type <= ISingularPointsFinder::LAST_EIG_PROP; ++prop_type)
+		{
+			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+		}
 		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_LOG);
 		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_GRAD);
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG);
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG_LOG);
 	}
 	else
 	{

@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include <shark/Data/CVDatasetTools.h>
+#include "../Disser/CommonUtilities/common_functions.h"
 
 namespace molecule_descriptor
 {
@@ -112,11 +113,7 @@ struct LabelsCmp<unsigned int>
 		return elem1 == elem2;
 	}
 };
-template <typename T>
-T Sqr(const T num)
-{
-	return num * num;
-}
+
 template<>
 struct LabelsCmp<shark::RealVector>
 {

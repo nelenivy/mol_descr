@@ -53,9 +53,15 @@ public:
 		PCA_MEAN_CURV, PCA_ELECTR_POTENT, PCA_STERIC_POTENT,
 		LAST_PCA_PROP = PCA_STERIC_POTENT, 
 
-		SEGM_NUM = LAST_PCA_PROP + 1,
+		EIG_GAUSS_CURV,
+		FIRST_EIG_PROP = EIG_GAUSS_CURV, 
+		EIG_MEAN_CURV, EIG_ELECTR_POTENT, EIG_STERIC_POTENT,
+		LAST_EIG_PROP = EIG_STERIC_POTENT, 
+
+		SEGM_NUM,
 		FIRST_ADDITIONAL_PROP = SEGM_NUM, 
-		SURF_TYPE, PCA_LOG, PCA_SCALE_SPACE, 		
+		SURF_TYPE, PCA_LOG, PCA_SCALE_SPACE, 
+		PCA_GRAD, PCA_EIG,PCA_EIG_LOG,
 		PROPS_NUM
 	};
 	virtual void GetVerticesWithDblProp(std::vector<std::pair<cv::Point3d, double>>& vertices_with_prop, 
@@ -123,6 +129,22 @@ inline const char* SurfPropertyName(const ISingularPointsFinder::SurfProperty pr
 	{
 		return "PCA_STERIC_POTENT";
 	}
+	else 	if (prop_type == ISingularPointsFinder::EIG_GAUSS_CURV)
+	{
+		return "EIG_GAUSS_CURV";
+	}
+	else if (prop_type == ISingularPointsFinder::EIG_MEAN_CURV)
+	{
+		return "EIG_MEAN_CURV";
+	}
+	else if (prop_type == ISingularPointsFinder::EIG_ELECTR_POTENT)
+	{
+		return "EIG_ELECTR_POTENT";
+	}
+	else if (prop_type == ISingularPointsFinder::EIG_STERIC_POTENT)
+	{
+		return "EIG_STERIC_POTENT";
+	}
 	else if (prop_type == ISingularPointsFinder::SEGM_NUM)
 	{
 		return "SEGM_NUM";
@@ -138,6 +160,18 @@ inline const char* SurfPropertyName(const ISingularPointsFinder::SurfProperty pr
 	else if (prop_type == ISingularPointsFinder::PCA_SCALE_SPACE)
 	{
 		return "PCA_SCALE_SPACE";
+	}
+	else if (prop_type == ISingularPointsFinder::PCA_GRAD)
+	{
+		return "PCA_GRAD";
+	}
+	else if (prop_type == ISingularPointsFinder::PCA_EIG)
+	{
+		return "PCA_EIG";
+	}
+	else if (prop_type == ISingularPointsFinder::PCA_EIG_LOG)
+	{
+		return "PCA_EIG_LOG";
 	}
 	else 
 	{

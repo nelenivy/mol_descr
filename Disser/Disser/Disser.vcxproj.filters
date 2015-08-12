@@ -122,6 +122,12 @@
     <ClInclude Include="SingularPoints\pca_projections.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
+    <ClInclude Include="GraphLib\gradient_calculator.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphLib\coordinates_transform.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

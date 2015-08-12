@@ -8,6 +8,7 @@
 #include "../Common/singular_point.h"
 #include "GraphLib/array_property_map.h"
 #include "GraphLib\proxy_property_map.h"
+#include "GraphLib\gradient_calculator.h"
 #include "scale_space_blur.h"
 #include "mesh_constructor.h"
 #include "mesh_types.h"
@@ -70,8 +71,11 @@ private:
 	void CalculateVerticesSurfaceType(const Mesh& mesh);
 	void CalcSingPtsFromCurvatureScales(const Mesh& mesh);
 	void CalculatePropsInSingPts(const bool calc_prop_as_average);
-	void CalcShiftsMaximums();
 	void CalcCurvature(const Mesh& mesh);
+	void CalcTangentBasis(const Mesh& mesh);
+	void CalcScaleSpacePropsHessianRatio(const Mesh& mesh);
+	void CalcHessianOfProjectedLog(const Mesh& mesh);
+	void CalculateDistanceMaps(const Mesh& mesh);
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesTypeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> VetrticesCurvMap;
@@ -81,9 +85,6 @@ private:
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> DoubleVertGraphProp;
 
 	MeshKeeper m_mesh_keeper;
-	Mesh m_filtered_mesh;
-	std::vector<Mesh> m_filtered_mesh_levels;
-	std::vector<Mesh> m_filtered_mesh_levels_2;
 	DoubleVertGraphProp m_mean_curvature;
 	DoubleVertGraphProp m_gaussian_curvature;
 
@@ -100,7 +101,7 @@ private:
 
 	int m_sing_pts_levels_num;
 	int m_scale_space_levels_num;
-	int m_diff_between_sing_pts_levels_and_scale_space_levels;
+	int m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls;
 	bool m_detect_blobs;
 	bool m_use_DOG_as_LOG_approximation;
 	bool m_use_euclid_distance;
@@ -110,8 +111,8 @@ private:
 	double m_init_curv_sigma;
 	double m_sigma_max;
 
-	typedef ProxyPropMap<
-		boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
+	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
+	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
 	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> m_scale_space_blurrer;
 	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space_diff;
 
@@ -124,9 +125,28 @@ private:
 		cv::Mat_<double> vect_to_project_on;
 	};
 	typedef ContPropMap<VerticesGraph, std::vector<PCAProjecter>, VERTEX> PCAProjecterMap;
+	std::vector<PCAProjecterMap> m_scale_space_projecter;
+
 	std::vector<DoubleVertGraphProp> m_detector_function_projected;
 	std::vector<DoubleVertGraphProp> m_scale_space_projected;
 	std::vector<std::vector<DoubleVertGraphProp>> m_projecters_coords;
+
+	typedef ContPropMap<VerticesGraph, std::vector<cv::Mat_<double>>, VERTEX> TangentBasisMap;
+	TangentBasisMap m_tangent_basis_map;
+
+	std::vector<HessianMatrixCalculator> m_hessian_map_calculators;
+	std::vector<std::vector<DoubleVertGraphProp>> m_props_hessian_ratio;
+	std::vector<std::vector<DoubleVertGraphProp>> m_grad_dx;
+	std::vector<std::vector<DoubleVertGraphProp>> m_grad_dy;
+	std::vector<DoubleVertGraphProp> m_projected_grad_x;
+	std::vector<DoubleVertGraphProp> m_projected_grad_y;
+	std::vector<DoubleVertGraphProp> m_projected_grad_norm;
+	std::vector<DoubleVertGraphProp> m_props_hessian_ratio_of_proj;
+
+	std::vector<DoubleVertGraphProp> m_props_hessian_ratio_of_proj_LOG;
+	//distance maps
+	cv::Mat_<double> m_vert_vert_dist;
+	cv::Mat_<double> m_vert_tr_dist;
 };
 
 }

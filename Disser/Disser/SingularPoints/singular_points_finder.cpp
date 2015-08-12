@@ -11,6 +11,8 @@
 #include "GraphLib\proxy_property_map.h"
 #include "GraphLib\graph_functions.h"
 #include "CommonUtilities\common_functions.h"
+#include "GraphLib\coordinates_transform.h"
+#include "GraphLib\graph_dist_calculate.h"
 #include "points_keeper.h"
 #include "properties_calculator.h"
 
@@ -27,6 +29,7 @@ void SngPtsFinderSegmentation::Process(const std::vector<cv::Point3d>& vertices,
 {
 	m_mesh_keeper.ConstructMesh(vertices, normals, triangles);
 	const Mesh& mesh_to_use = /*m_mesh_keeper.GetMesh();*/GetMesh();
+	CalculateDistanceMaps(m_mesh_keeper.GetMesh());
 	CalculateCurvature(m_mesh_keeper.GetMesh());
 	const int kMaxSegmSize = 500;
 	SegmentMolecularSurface(kMaxSegmSize, mesh_to_use);
@@ -104,6 +107,77 @@ void SngPtsFinderSegmentation::CalcPropInSingPts(const GraphPropMap& graph_prop_
 	}
 }
 
+void SngPtsFinderSegmentation::CalculateDistanceMaps(const Mesh& mesh)
+{
+	const VerticesGraph& vertices_graph = mesh.vertices;
+	//mean edge length
+	double mean_dist = 0.0;
+	double edges_num = 0.0;
+	std::vector<double> edges_lengths;
+	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+		curr_vertice != end_vertices; ++curr_vertice)
+	{
+		boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
+			get(boost::vertex_info_3d, vertices_graph);
+		CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+
+		for (auto curr_neighb = adjacent_vertices(*curr_vertice, vertices_graph).first, 
+			end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second; 
+			curr_neighb != end_neighb; ++curr_neighb)
+		{
+			const double curr_dist = cv::norm(coord_map[*curr_vertice] - coord_map[*curr_neighb]);
+			edges_lengths.push_back(curr_dist);
+			mean_dist += curr_dist;
+			++edges_num;
+		}
+	}	
+	std::nth_element(edges_lengths.begin(), edges_lengths.begin() + Round(0.9 * edges_lengths.size()), edges_lengths.end());
+	std::cout << mean_dist / edges_num << " " << edges_lengths[Round(0.9 * edges_lengths.size())] << "\n";
+
+	//distance maps
+
+	const TrianglesGraph& triangles_graph = mesh.triangles;
+	boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map_tr = 
+		get(boost::vertex_info_3d, triangles_graph);
+	const auto coord_map_tr = GetProxyPropMap(coord_3d_map_tr, GetCoord<MeshTriangle>());
+
+	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
+		get(boost::vertex_info_3d, vertices_graph);
+	CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+	//calculate distances
+	m_vert_vert_dist.create(num_vertices(vertices_graph), num_vertices(vertices_graph));
+	m_vert_tr_dist.create(num_vertices(vertices_graph), num_vertices(triangles_graph));
+
+	if (0/*m_use_euclid_distance*/)
+	{
+		CalcDistBetweenGraphs(vertices_graph, coord_map, vertices_graph, coord_map, m_vert_vert_dist);
+		CalcDistBetweenGraphs(vertices_graph, coord_map, triangles_graph, coord_map_tr, m_vert_tr_dist);
+	}
+	else
+	{//USE GEODESIC DISTANCE
+		DijkstraDistMapCalculator<VerticesGraph, double> djikstra_dist;
+		djikstra_dist.Calc(vertices_graph, m_vert_vert_dist);
+
+		for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			for (auto curr_tr = vertices(triangles_graph).first, end_tr = vertices(triangles_graph).second; 
+				curr_tr != end_tr; ++curr_tr)
+			{
+				m_vert_tr_dist(*curr_vertice, *curr_tr) = (m_vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetA()) + 
+					m_vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetB()) + 
+					m_vert_vert_dist(*curr_vertice, coord_3d_map_tr[*curr_tr].GetC())) / 3.0;
+			}
+		}
+	}
+
+	double min_val = 0, max_val = 0;
+	cv::minMaxLoc(m_vert_vert_dist, &min_val, &max_val);
+	std::cout << min_val << " " << max_val << "\n";
+	cv::minMaxLoc(m_vert_tr_dist, &min_val, &max_val);
+	std::cout << min_val << " " << max_val << "\n";
+
+}
 void SngPtsFinderSegmentation::GetNonMarkedSingularPointsLevels(std::pair<std::vector<std::vector<NonMarkedSingularPoint>>, std::vector<std::vector<size_t>>>& non_marked_singular_points)
 {
 	
@@ -177,6 +251,18 @@ void SngPtsFinderSegmentation::Clear()
 	m_triangles_segm.Clear();
 }
 
+void SngPtsFinderSegmentation::CalcTangentBasis(const Mesh& mesh)
+{
+	//calculate tangent basis
+	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
+		get(boost::vertex_info_3d, mesh.vertices);
+	CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+	NormalMap norm_map = GetProxyPropMap(coord_3d_map, GetNormal<Vertice>());
+	m_tangent_basis_map.SetGraph(mesh.vertices);
+	CalcTangentCoordSystemMap(mesh.vertices, coord_map, norm_map, m_tangent_basis_map);
+}
+
+
 void SngPtsFinderSegmentation::CalculateCurvature(const Mesh& mesh)
 {
 	const VerticesGraph& vertices_graph = mesh.vertices;
@@ -190,7 +276,8 @@ void SngPtsFinderSegmentation::CalculateCurvature(const Mesh& mesh)
 			curr_vertice != end_vertices; ++curr_vertice)
 	{
 			Curvature curvatures;
-			curvature_calculator.CalculateCurvatureCubic(vertices_graph, get(boost::vertex_info_3d, vertices_graph), *curr_vertice, curvatures);
+			curvature_calculator.CalculateCurvatureCubic(vertices_graph, get(boost::vertex_info_3d, vertices_graph), 
+				m_tangent_basis_map, *curr_vertice, curvatures);
 			m_gaussian_curvature[*curr_vertice] = curvatures.gaussian_curv;
 			m_mean_curvature[*curr_vertice] = curvatures.mean_curv;
 	}

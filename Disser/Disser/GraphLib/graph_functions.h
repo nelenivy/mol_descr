@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <utility>
 #include <deque>
 
 #include "boost/graph/properties.hpp"
@@ -8,8 +9,91 @@
 
 namespace molecule_descriptor
 {
+//find vertices from graph_2 which are within distance threshold from vertice vert_1 of graph_1
+template <class Graph1Descr, class Graph2, class Graph12DistMap, class MaskMap>
+size_t GetVerticesWithinDistMask(const Graph1Descr vert_1, const Graph2& graph_2, const Graph12DistMap& dist_map, 
+						   const double dist_thresh, MaskMap& mask_map)
+{
+	if (mask_map.Size() != boost::num_vertices(graph_2))
+	{
+		mask_map.SetGraph(graph_2);
+	}
+	size_t vert_num_in_mask = 0;
+	for (auto neighb_vertice = vertices(graph_2).first, end_neighb_vertices = vertices(graph_2).second; 
+		neighb_vertice != end_neighb_vertices; ++neighb_vertice)
+	{
+
+		if (dist_map(vert_1, *neighb_vertice) <= dist_thresh)
+		{
+			mask_map[*neighb_vertice] = 255;
+			++vert_num_in_mask;
+		}
+		else
+		{
+			mask_map[*neighb_vertice] = 0;
+		}
+	}
+
+	return vert_num_in_mask;
+}
+template <class GraphDescr, class Graph, class GraphDistMap, class MaskMap>
+size_t GetVerticesWithinDistMaskPlusAdjacent(const GraphDescr vert, const Graph& graph, const GraphDistMap& dist_map, 
+								 const double dist_thresh, MaskMap& mask_map)
+{
+	size_t vert_num_in_mask = GetVerticesWithinDistMask( vert, graph, dist_map, dist_thresh, mask_map);
+
+	for (auto neighb_it = adjacent_vertices(vert, graph).first,
+		end_neighb = adjacent_vertices(vert, graph).second; 
+		neighb_it != end_neighb; ++neighb_it)
+	{
+		if (mask_map[*neighb_it] == 0)
+		{
+			++vert_num_in_mask;
+			mask_map[*neighb_it] == 255;
+		}
+	}
+
+	return vert_num_in_mask;
+}
+
+//find vertices from graph_2 which are within distance threshold from vertice vert_1 of graph_1
+template <class Graph1Descr, class Graph2, class Graph12DistMap, class Graph2Descr>
+void GetVerticesWithinDist(const Graph1Descr vert_1, const Graph2& graph_2, const Graph12DistMap& dist_map, 
+								 const double dist_thresh, std::vector<Graph2Descr>& vertices_in_mask)
+{
+	vertices_in_mask.clear();
+
+	for (auto neighb_vertice = vertices(graph_2).first, end_neighb_vertices = vertices(graph_2).second; 
+		neighb_vertice != end_neighb_vertices; ++neighb_vertice)
+	{
+
+		if (dist_map(vert_1, *neighb_vertice) <= dist_thresh)
+		{
+			vertices_in_mask.push_back(*neighb_vertice);
+		}
+	}
+}
+
+//find vertices from graph_2 which are within distance threshold from vertice vert_1 of graph_1
+template <class GraphDescr, class Graph, class GraphDistMap>
+void GetVerticesWithinDistPlusAdjacent(const GraphDescr vert, const Graph& graph, const GraphDistMap& dist_map, 
+						   const double dist_thresh, std::vector<GraphDescr>& vertices_in_mask)
+{
+	GetVerticesWithinDist(vert, graph, dist_map, dist_thresh, vertices_in_mask);
+
+	for (auto neighb_it = adjacent_vertices(vert, graph).first,
+		end_neighb = adjacent_vertices(vert, graph).second; 
+		neighb_it != end_neighb; ++neighb_it)
+	{
+		if (vertices_in_mask.end() == std::find(vertices_in_mask.begin(), vertices_in_mask.end(), *neighb_it))
+		{
+			vertices_in_mask.push_back(*neighb_it);
+		}
+	}
+}
+
 template <class Graph, class PropMap, class CompareFuncMax, class CompareFuncMin>
-void FindLocalMaximumsOfAbsVal(const Graph& graph, const PropMap& prop_map, 
+void FindLocalMaxAndMin(const Graph& graph, const PropMap& prop_map, 
 		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>& maximums, 
 		CompareFuncMax comp_func_max, CompareFuncMin comp_func_min)
 {
@@ -237,15 +321,18 @@ double ProjectPCA(const std::vector<PropMap>& prop_map, const CoordMap& coord_ma
 	return res;
 }
 //here we search not only through local members but through neighbours on levels
-template <class Graph, class PropMap, class CoordMap, class PropMapProj, class CompareFuncMax, class CompareFuncMin>
+template <class Graph, class PropMap, class CoordMap, class PropMapProj, 
+class CompareFuncMax, class CompareFuncMin, class VertDistMap>
 void FindLocalMaximumsOnLevelsVect(const Graph& graph, const CoordMap& coord_map, const std::vector<std::vector<PropMap>>& prop_map_levels, 
 								const std::vector<PropMapProj>& prop_vect_project_levels, 
-							   std::vector<std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>>& maximums, 
-							   CompareFuncMax comp_func_max, CompareFuncMin comp_func_min, const bool use_levels, const bool one_ring_neighb)
+								const VertDistMap& vert_dist_map, const double dist_thresh,
+								CompareFuncMax comp_func_max, CompareFuncMin comp_func_min, 
+								const bool use_levels, 
+							   std::vector<std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>>& maximums)
 {
 	maximums.assign(prop_map_levels.size() - 2, std::vector<typename boost::graph_traits<Graph>::vertex_descriptor>());
 	std::vector<size_t> max_level_count(prop_map_levels.size(), 0);
-	//std::vector<double> curr_vect_to_project(prop_map_levels[0].size());
+	std::vector<typename boost::graph_traits<Graph>::vertex_descriptor> vertices_within_dist;
 
 	for (size_t level = 1; level < prop_map_levels.size() - 1; ++level)
 	{
@@ -257,28 +344,18 @@ void FindLocalMaximumsOnLevelsVect(const Graph& graph, const CoordMap& coord_map
 			const size_t prev_level = use_levels ? level - 1 : level;
 			const size_t next_level = use_levels ? level + 1 : level;
 			//vector on which we will project
-			/*for (size_t curr_prop = 0; curr_prop < prop_vect_project_levels[level].size(); ++curr_prop)
-			{
-				curr_vect_to_project[curr_prop] = prop_vect_project_levels[level][curr_prop][*curr_vertice];
-			}*/
-			//const double curr_norm = Norm(prop_vect_project_levels[level], *curr_vertice);
-
 			const double curr_scalar_prod = ProjectPCADiff(prop_map_levels[level], coord_map, prop_vect_project_levels[level],*curr_vertice);
-			//ScalarProduct(curr_vect_to_project, prop_map_levels[level], *curr_vertice);
+
+			GetVerticesWithinDist(*curr_vertice, graph, vert_dist_map, dist_thresh, vertices_within_dist);
+
 			double mean_diff_neighb = 0;
 			int neighb_num = 2;
 			for (size_t neighb_level = prev_level; neighb_level <= next_level; ++neighb_level)
 			{
-				//for (size_t curr_prop = 0; curr_prop < prop_vect_project_levels[level].size(); ++curr_prop)
-				{
-					//curr_vect_to_project[curr_prop] = prop_vect_project_levels[neighb_level /*level*/][curr_prop][*curr_vertice];
-				}
 				if (neighb_level != level)
 				{ 
 					const double curr_neighb_prod =ProjectPCADiff(prop_map_levels[neighb_level], coord_map, 
 						prop_vect_project_levels[neighb_level],*curr_vertice);
-						//ScalarProductOneVert(prop_vect_project_levels[neighb_level], prop_map_levels[neighb_level], *curr_vertice);
-						//ScalarProduct(curr_vect_to_project, prop_map_levels[neighb_level], *curr_vertice);
 
 					mean_diff_neighb += curr_scalar_prod - curr_neighb_prod;
 					if(! comp_func_max(curr_scalar_prod, curr_neighb_prod))
@@ -291,10 +368,13 @@ void FindLocalMaximumsOnLevelsVect(const Graph& graph, const CoordMap& coord_map
 					}
 				}
 
-				for (auto curr_neighb = adjacent_vertices(*curr_vertice, graph).first, 
-					end_neighb = adjacent_vertices(*curr_vertice, graph).second; 
+				for (auto curr_neighb = vertices_within_dist.begin(), end_neighb = vertices_within_dist.end(); 
 					curr_neighb != end_neighb; ++curr_neighb)
 				{
+					if (*curr_neighb == *curr_vertice)
+					{
+						continue;
+					}
 					const double curr_neighb_prod = ProjectPCADiff(prop_map_levels[neighb_level], coord_map, 
 						prop_vect_project_levels[neighb_level],*curr_neighb);
 						//ScalarProductOneVert(prop_vect_project_levels[neighb_level], prop_map_levels[neighb_level], *curr_neighb);
@@ -308,34 +388,7 @@ void FindLocalMaximumsOnLevelsVect(const Graph& graph, const CoordMap& coord_map
 					if (! comp_func_min(curr_scalar_prod, curr_neighb_prod))
 					{
 						minimum = false;
-					}
-
-					if (!one_ring_neighb)
-					{
-						for (auto curr_neighb_neighb = adjacent_vertices(*curr_neighb, graph).first, 
-							end_neighb_neighb = adjacent_vertices(*curr_neighb, graph).second; 
-							curr_neighb_neighb != end_neighb_neighb; ++curr_neighb_neighb)
-						{
-							if (*curr_neighb_neighb == *curr_vertice)
-							{
-								continue;
-							}
-							const double curr_neighb_prod =  ProjectPCADiff(prop_map_levels[neighb_level], coord_map, 
-								prop_vect_project_levels[neighb_level],*curr_neighb_neighb);
-								//ScalarProductOneVert(prop_vect_project_levels[neighb_level], prop_map_levels[neighb_level], *curr_neighb_neighb);
-								//ScalarProduct(curr_vect_to_project, prop_map_levels[neighb_level], *curr_neighb_neighb);
-							mean_diff_neighb += curr_scalar_prod - curr_neighb_prod;
-							neighb_num++;
-							if (! comp_func_max(curr_scalar_prod, curr_neighb_prod))
-							{
-								maximum = false;
-							}
-							if (! comp_func_min(curr_scalar_prod, curr_neighb_prod))
-							{
-								minimum = false;
-							}
-						}
-					}
+					}					
 				}
 			}
 			

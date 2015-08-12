@@ -1,12 +1,13 @@
 #pragma once
 #include <vector>
+#include <utility>
 #include <iostream>
-
 #include "boost/graph/properties.hpp"
 #include "boost/graph/graph_traits.hpp"
 #include "opencv2/core/core.hpp"
 
 #include "CommonUtilities/common_functions.h"
+#include "GraphLib/coordinates_transform.h"
 
 namespace molecule_descriptor
 {
@@ -46,26 +47,24 @@ public:
 	//friend struct CurvatureCalculatorHelper<GraphType, CubicCurvature>;
 
 	CurvatureCalculator(const int max_neighbours_num);
-	template <typename CoordMapT>
-	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Curvature& curvature_matr);
-	template <typename CoordMapT>
-	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertice, Curvature& curvature_matr);
+	template <typename CoordMapT, typename TangentBasisMap>
+	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+		const VertexDescr mesh_vertice, Curvature& curvature_matr);
+	template <typename CoordMapT, typename TangentBasisMap>
+	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+		const VertexDescr mesh_vertice, Curvature& curvature_matr);
 private:
-	template <class CurvatureType, typename CoordMapT>
-	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const VertexDescr mesh_vertices, Curvature& curvature_matr);
+	template <class CurvatureType, typename CoordMapT, typename TangentBasisMap>
+	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+		const VertexDescr mesh_vertices, Curvature& curvature_matr);
 	template <class Info3DType, class CurvatureType>
 	void FillEquationMatrices(const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
 	template <class CurvatureType>
 	void ReservePlace(const int max_neighbours_num);
 
-	cv::Mat_<double>	m_E, 
-					m_rotat_mat,
+	cv::Mat_<double>	m_rotat_mat,
 					m_temp_v,
-					m_r1,
-					m_r2,
-					m_r3,
 					m_ans;
-	cv::Mat_<double> m_curr_normal;
 	cv::Mat_<double> m_curr_coord;
 	cv::Mat_<double> m_neighb_normal;
 	cv::Mat_<double> m_neighb_coord;
@@ -73,6 +72,7 @@ private:
 	cv::Mat_<double> m_coefficient_matrix,
 				 m_z_vect; 
 	int m_max_neighbours_num;
+	VectorOrientedCoordFinder m_coord_finder;
 };
 //////////////////////////////////////////////////////////////////////////
 //class for imitating specialization of template method of template class
@@ -100,42 +100,38 @@ struct CurvatureCalculatorHelper<Info3DType, NodeType, ParabolloidFittingCurvatu
 template <class NodeType>
 CurvatureCalculator<NodeType>::CurvatureCalculator(const int max_neighbours_num)
 {
-	m_E			= cv::Mat_<double>::eye(3, 3); 
 	m_rotat_mat	= cv::Mat_<double>::zeros(3, 3);
 	m_temp_v	= cv::Mat_<double>::zeros(1, 3);
-	m_r1		= cv::Mat_<double>::zeros(3, 1);
-	m_r2		= cv::Mat_<double>::zeros(3, 1);
-	m_r3		= cv::Mat_<double>::zeros(3, 1);
 	m_max_neighbours_num = max_neighbours_num;
 }
 
 //"A Novel Cubic-Order Algorithm for Approximating Principal Direction Vectors"
+
 template <class GraphType>
-template <typename CoordMapT>
-void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, Curvature& curvature_matr)
+template <typename CoordMapT, typename TangentBasisMap>
+void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	const VertexDescr mesh_vertex, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<CubicFittingCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<CubicFittingCurvature>(graph, coord_map, tan_basis_map, mesh_vertex, curvature_matr);
 }
 
 //"A Comparison of Gaussian and Mean Curvatures Estimation Methods on Triangular Meshes"
 template <class GraphType>
-template <typename CoordMapT>
-void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, Curvature& curvature_matr)
+template <typename CoordMapT, typename TangentBasisMap>
+void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	const VertexDescr mesh_vertex, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<ParabolloidFittingCurvature>(graph, coord_map, mesh_vertices, curvature_matr);
+	CalculateCurvatureImpl<ParabolloidFittingCurvature>(graph, coord_map, tan_basis_map, mesh_vertex, curvature_matr);
 }
 
 template <class GraphType>
-template <class CurvatureType, typename CoordMapT>
-void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map,
-	const VertexDescr mesh_vertices, Curvature& curvature_values)
+template <class CurvatureType, typename CoordMapT, typename TangentBasisMap>
+void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	const VertexDescr mesh_vertex, Curvature& curvature_values)
 {
 	typedef boost::graph_traits<GraphType>::adjacency_iterator AdjacencyIter;
-	AdjacencyIter curr_neighbour, last;
-	boost::tie(curr_neighbour, last) = adjacent_vertices(mesh_vertices, graph);
-	if (curr_neighbour == last)
+	
+	if (adjacent_vertices(mesh_vertex, graph).first == adjacent_vertices(mesh_vertex, graph).second)
 	{//if there are no neighbours we can't run algorithm
 		curvature_values.gaussian_curv = 0.0;
 		curvature_values.mean_curv = 0.0;
@@ -143,35 +139,17 @@ void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& gra
 	}
 
 	ReservePlace<CurvatureType>(m_max_neighbours_num);
-	Point_ToMat_Transposed(coord_map[mesh_vertices].Normal(), m_curr_normal);
-	Point_ToMat_Transposed(coord_map[mesh_vertices].Center(), m_curr_coord);
 	//find coordinate transformation
-	m_rotat_mat = m_E - m_curr_normal * m_curr_normal.t();
-
-	m_r1(0) = 1;
-	m_r1(1) = 0; 
-	m_r1(2) = 0;			        
-	m_r1 =  m_rotat_mat.t() * m_r1;
-	m_r1 /= norm(m_r1);
-	m_curr_normal.copyTo(m_r3);
-
-	m_r2(0)=	m_r3(1) * m_r1(2) - m_r3(2) * m_r1(1);
-	m_r2(1)= - (m_r3(0) * m_r1(2) - m_r3(2) * m_r1(0));
-	m_r2(2)=	m_r3(0) * m_r1(1) - m_r3(1) * m_r1(0);
-
-	m_r1.copyTo(m_rotat_mat.col(0));
-	m_r2.copyTo(m_rotat_mat.col(1));
-	m_r3.copyTo(m_rotat_mat.col(2));
-
-	boost::tie(curr_neighbour, last) = adjacent_vertices(mesh_vertices, graph);
-	const size_t neighb_num = out_degree(mesh_vertices, graph);
+	tan_basis_map[mesh_vertex].copyTo(m_rotat_mat);
+	const size_t neighb_num = out_degree(mesh_vertex, graph);
 	ReservePlace<CurvatureType>(static_cast<int>(neighb_num));
-	typedef decltype(coord_map[mesh_vertices]) Info3DType;
-	for (; curr_neighbour != last; ++curr_neighbour)
+	typedef decltype(coord_map[mesh_vertex]) Info3DType;
+	for (auto curr_neighbour = adjacent_vertices(mesh_vertex, graph).first, end_neighb = adjacent_vertices(mesh_vertex, graph).second; 
+		curr_neighbour != end_neighb; ++curr_neighbour)
 	{ 
-		const size_t neighb_ind = neighb_num - (last - curr_neighbour);
+		const size_t neighb_ind = neighb_num - (end_neighb - curr_neighbour);
 		FillEquationMatrices<Info3DType, CurvatureType>(
-			coord_map[mesh_vertices], 
+			coord_map[mesh_vertex], 
 			coord_map[*curr_neighbour], 
 			m_coefficient_matrix[CurvatureType::kRowsForOneElement * neighb_ind],
 			m_z_vect[CurvatureType::kRowsForOneElement * neighb_ind]);
@@ -186,12 +164,10 @@ template <class Info3DType, class GraphType>
 void CurvatureCalculatorHelper<Info3DType, GraphType, ParabolloidFittingCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator, 
 	const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect)
 {
-	Point_ToMat_(curr_vertex.Center(), calculator.m_curr_coord);
-	Point_ToMat_(curr_vertex.Normal(), calculator.m_curr_normal);
-	Point_ToMat_(neighb_vertex.Center(), calculator.m_neighb_coord);
-	Point_ToMat_(neighb_vertex.Normal(), calculator.m_neighb_normal);
+	Point_ToMat_Transposed(curr_vertex.Center(), calculator.m_curr_coord);
+	Point_ToMat_Transposed(neighb_vertex.Center(), calculator.m_neighb_coord);
 	//transform neighbours coordinates and normal in new coordinates
-	calculator.m_temp_v = (calculator.m_neighb_coord - calculator.m_curr_coord) * calculator.m_rotat_mat;                      
+	calculator.m_temp_v = calculator.m_rotat_mat*(calculator.m_neighb_coord - calculator.m_curr_coord);                      
 	const double x = calculator.m_temp_v(0);
 	const double y = calculator.m_temp_v(1);
 	const double z = calculator.m_temp_v(2);
@@ -206,17 +182,16 @@ template <class Info3DType, class GraphType>
 void CurvatureCalculatorHelper<Info3DType, GraphType, CubicFittingCurvature>::FillEquationMatrices(CurvatureCalculator<GraphType>& calculator,
 	const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect)
 {
-	Point_ToMat_(curr_vertex.Center(), calculator.m_curr_coord);
-	Point_ToMat_(curr_vertex.Normal(), calculator.m_curr_normal);
-	Point_ToMat_(neighb_vertex.Center(), calculator.m_neighb_coord);
-	Point_ToMat_(neighb_vertex.Normal(), calculator.m_neighb_normal);
+	Point_ToMat_Transposed(curr_vertex.Center(), calculator.m_curr_coord);
+	Point_ToMat_Transposed(neighb_vertex.Center(), calculator.m_neighb_coord);
+	Point_ToMat_Transposed(neighb_vertex.Normal(), calculator.m_neighb_normal);
 	//transform neighbours coordinates and normal in new coordinates
-	calculator.m_temp_v = (calculator.m_neighb_coord - calculator.m_curr_coord) * calculator.m_rotat_mat;                      
+	calculator.m_temp_v = calculator.m_rotat_mat *(calculator.m_neighb_coord - calculator.m_curr_coord);                      
 	const double x = calculator.m_temp_v(0);
 	const double y = calculator.m_temp_v(1);
 	const double z = calculator.m_temp_v(2);
 
-	calculator.m_temp_v =  calculator.m_neighb_normal * calculator.m_rotat_mat;
+	calculator.m_temp_v =  calculator.m_rotat_mat * calculator.m_neighb_normal;
 	const double nx = calculator.m_temp_v(0);
 	const double ny = calculator.m_temp_v(1);
 	const double nz = calculator.m_temp_v(2);	
