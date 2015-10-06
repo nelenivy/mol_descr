@@ -22,7 +22,7 @@ namespace molecule_descriptor
 using namespace std;
 using namespace cv;
 
-void SngPtsFinderSegmentation::Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
+void SngPtsFinderSegmentation::CalcSingPtsFromCalculatedProperties(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 	const std::vector<cv::Point3i>& triangles, const std::vector<std::pair<cv::Point3d, double>>& charges, 
 	const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
 	const bool calc_prop_as_average)
@@ -119,7 +119,7 @@ void SngPtsFinderSegmentation::CalculateDistanceMaps(const Mesh& mesh)
 	{
 		boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
 			get(boost::vertex_info_3d, vertices_graph);
-		CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+		CoordMap coord_map = GetProxyPropMapVal(coord_3d_map, GetCoord<Vertice>());
 
 		for (auto curr_neighb = adjacent_vertices(*curr_vertice, vertices_graph).first, 
 			end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second; 
@@ -139,11 +139,11 @@ void SngPtsFinderSegmentation::CalculateDistanceMaps(const Mesh& mesh)
 	const TrianglesGraph& triangles_graph = mesh.triangles;
 	boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map_tr = 
 		get(boost::vertex_info_3d, triangles_graph);
-	const auto coord_map_tr = GetProxyPropMap(coord_3d_map_tr, GetCoord<MeshTriangle>());
+	const auto coord_map_tr = GetProxyPropMapVal(coord_3d_map_tr, GetCoord<MeshTriangle>());
 
 	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
 		get(boost::vertex_info_3d, vertices_graph);
-	CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
+	CoordMap coord_map = GetProxyPropMapVal(coord_3d_map, GetCoord<Vertice>());
 	//calculate distances
 	m_vert_vert_dist.create(num_vertices(vertices_graph), num_vertices(vertices_graph));
 	m_vert_tr_dist.create(num_vertices(vertices_graph), num_vertices(triangles_graph));
@@ -256,10 +256,10 @@ void SngPtsFinderSegmentation::CalcTangentBasis(const Mesh& mesh)
 	//calculate tangent basis
 	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map = 
 		get(boost::vertex_info_3d, mesh.vertices);
-	CoordMap coord_map = GetProxyPropMap(coord_3d_map, GetCoord<Vertice>());
-	NormalMap norm_map = GetProxyPropMap(coord_3d_map, GetNormal<Vertice>());
+	CoordMap coord_map = GetProxyPropMapVal(coord_3d_map, GetCoord<Vertice>());
+	NormalMap norm_map = GetProxyPropMapVal(coord_3d_map, GetNormal<Vertice>());
 	m_tangent_basis_map.SetGraph(mesh.vertices);
-	CalcTangentCoordSystemMap(mesh.vertices, coord_map, norm_map, m_tangent_basis_map);
+	CalcTangentCoordSystemMap(mesh.vertices, coord_map, norm_map, 0.01, m_tangent_basis_map);
 }
 
 

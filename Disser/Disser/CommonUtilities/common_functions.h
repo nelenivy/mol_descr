@@ -62,6 +62,25 @@ void Point_ToMat_Transposed(const cv::Point_<T>& point, cv::Mat_<T>& mat)
 	temp_mat.copyTo(mat);
 }
 
+template<typename T, int N>
+void Mat_ToVec(const cv::Mat_<T>& mat, cv::Vec<T, N>& point)
+{
+	std::copy(mat[0], mat[0] + N, &(point[0]));
+}
+
+template<typename T, int N>
+void Vec_ToMat_(const cv::Vec<T, N>& point, cv::Mat_<T>& mat)
+{
+	mat.create(1, N);
+	std::copy(&(point[0]), &(point[0]) + N, mat[0]);
+}
+template<typename T, int N>
+void Vec_ToMat_Transposed(const cv::Vec<T, N>& point, cv::Mat_<T>& mat)
+{
+	mat.create(N, 1);
+	std::copy(&(point[0]), &(point[0]) + N, mat[0]);
+}
+
 template<typename IteratorType>
 size_t CalculateRangeType(IteratorType types_begin, IteratorType types_end, 
 						  IteratorType max_vals_begin, IteratorType max_vals_end)

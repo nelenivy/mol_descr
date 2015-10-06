@@ -17,7 +17,7 @@ template <class Graph, class CoordMap, class FunctionMap, class DistanceMap>
 void CalcGradientInVertLeastSquares(const Graph& graph, const CoordMap& coord_map, 
 						const FunctionMap& func_map, const DistanceMap& dist_map, const double dist_thresh, 
 						const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,
-						const cv::Mat_<double>& tangent_basis, cv::Mat_<double>& grad)//vectors in columns, 3rd vector is normal to surface
+						const cv::Mat_<double>& tangent_basis, const double min_grad, const double max_grad, cv::Mat_<double>& grad)//vectors in columns, 3rd vector is normal to surface
 {
 	typedef typename boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
 	std::vector<VertexDescriptor> vertices_within_dist;
@@ -40,15 +40,17 @@ void CalcGradientInVertLeastSquares(const Graph& graph, const CoordMap& coord_ma
 		}
 		Point_ToMat_Transposed(coord_map[*neighb_vert], neighb_coord);
 		projected_vect = tangent_basis*(neighb_coord - cent_coord);
-		coeffs(curr_row, 0) = projected_vect(0,0);
-		coeffs(curr_row, 1) = projected_vect(0,1);
+		coeffs(curr_row, 0) = projected_vect(0);
+		coeffs(curr_row, 1) = projected_vect(1);
 
-		const double proj_length = sqrt(Sqr(projected_vect(0, 0)) + Sqr(projected_vect(0, 1)));
+		const double proj_length = sqrt(Sqr(projected_vect(0)) + Sqr(projected_vect(1)));
 		derivatives(curr_row, 0) = (func_map[*neighb_vert] - func_map[cent_vert]) / proj_length;
 	}
 
 	//SOLVE EQUATION
 	grad = coeffs.inv(DECOMP_SVD) * derivatives;
+	grad(0) = std::min(max_grad, std::max(min_grad, grad(0)));
+	grad(1) = std::min(max_grad, std::max(min_grad, grad(1)));
 }
 
 enum Direction {dX = 0, dY = 1};
@@ -95,7 +97,7 @@ void CalcGradientMaps(const Graph& graph, const CoordMap& coord_map,
 		if (least_squares_grad)
 		{
 			cv::Mat_<double> curr_grad;
-			CalcGradientInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert], curr_grad);
+			CalcGradientInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert], -1000.0, 1000.0, curr_grad);
 			grad_x[*curr_vert] = curr_grad(0);
 			grad_y[*curr_vert] = curr_grad(1);
 		}

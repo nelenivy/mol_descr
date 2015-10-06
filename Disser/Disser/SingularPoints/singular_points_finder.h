@@ -18,7 +18,7 @@ class SngPtsFinderSegmentation : public ISingularPointsFinder
 {
 public:
 	SngPtsFinderSegmentation() { }
-	virtual void Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
+	virtual void CalcSingPtsFromCalculatedProperties(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
 		const bool calc_prop_as_average);
@@ -76,8 +76,8 @@ private:
 	SingPtsDoublePropMap m_sing_pts_segm_area;
 
 	//distance maps
-	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
-	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
+	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
+	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
 
 	cv::Mat_<double> m_vert_vert_dist;
 	cv::Mat_<double> m_vert_tr_dist;

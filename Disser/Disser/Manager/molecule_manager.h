@@ -8,6 +8,8 @@
 
 #include "opencv2/core/core.hpp"
 #include "../Common/singular_point.h"
+#include "InputOutput/params_reader.h"
+
 #include "SingularPoints/i_singular_points_finder.h"
 
 namespace molecule_descriptor
@@ -21,6 +23,9 @@ public:
 	void Init(int argc, char** argv)
 	{
 		m_sing_pts_finder->InitParams(argc, argv);
+		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_scale_space", m_use_calculated_scale_space, false);
+		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_detector_function", m_use_calculated_detector_function, false);
+		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_eig_ratio", m_use_calculated_eig_ratio, false);
 	}
 	void SetSingPtsAlgorithm(const SingularPointsAlgorithm alg)
 	{
@@ -145,6 +150,11 @@ private:
 	void WriteSurfaceWithDblProp(const ISingularPointsFinder::SurfProperty prop_type);
 	void ReadSingularPointsLevelsTypes(const int levels_num);
 	void ReadSingularPointsLevelsLabels(const int levels_num);
+
+	void ReadScaleSpaceFunctions(const size_t levels_num,
+		const ISingularPointsFinder::SurfProperty first_prop, 
+		const ISingularPointsFinder::SurfProperty last_prop,
+		std::vector<std::vector<std::vector<double>>>& scale_space);
 private:
 	std::shared_ptr<ISingularPointsFinder> m_sing_pts_finder;
 	static const size_t kHistSize = 9;
@@ -196,6 +206,9 @@ private:
 	int m_pairs_levels_num;
 	int m_pairs_levels_overlap;
 	std::vector<pair_with_distance> m_pairs_vertices;
+	bool m_use_calculated_scale_space;
+	bool m_use_calculated_detector_function;
+	bool m_use_calculated_eig_ratio;
 };
 
 }

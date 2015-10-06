@@ -15,7 +15,7 @@ namespace molecule_descriptor
 class ISingularPointsFinder
 {
 public:
-	virtual void Process(const std::vector<cv::Point3d>& vertices, 
+	virtual void CalcSingPtsFromCalculatedProperties(const std::vector<cv::Point3d>& vertices, 
 		const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, 
@@ -34,6 +34,14 @@ public:
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii)
 	{
 
+	}
+	virtual size_t GetScaleSpaceLevelsNum() const 
+	{
+		return 0;
+	}
+	virtual size_t GetDetectorFuncLevelsNum() const 
+	{
+		return 0;
 	}
 	enum SurfProperty
 	{
@@ -62,6 +70,7 @@ public:
 		FIRST_ADDITIONAL_PROP = SEGM_NUM, 
 		SURF_TYPE, PCA_LOG, PCA_SCALE_SPACE, 
 		PCA_GRAD, PCA_EIG,PCA_EIG_LOG,
+		UNCOIN_BASIS, 
 		PROPS_NUM
 	};
 	virtual void GetVerticesWithDblProp(std::vector<std::pair<cv::Point3d, double>>& vertices_with_prop, 
@@ -71,11 +80,16 @@ public:
 	virtual void AppendProp(std::vector<double>& prop, SurfProperty prop_type)
 	{
 	}
-	virtual void SetMeanAndSigma(std::vector<std::vector<double>> mean_and_sigma)
+	virtual void SetMeanAndSigma(const std::vector<std::vector<double>>& mean_and_sigma)
 	{
 	}
 
 	virtual void InitParams(int argc, char** argv) = 0;
+
+	virtual void SetScaleSpace(const std::vector<std::vector<std::vector<double>>>& blurred_functions) { }
+	virtual void SetDetectorFunction(const std::vector<std::vector<std::vector<double>>>& detector_functions) { }
+	virtual void SetEigRatio(const std::vector<std::vector<double>>& eig_functions) { }
+
 	virtual ~ISingularPointsFinder() { }
 };
 
@@ -173,6 +187,10 @@ inline const char* SurfPropertyName(const ISingularPointsFinder::SurfProperty pr
 	{
 		return "PCA_EIG_LOG";
 	}
+	else if (prop_type == ISingularPointsFinder::UNCOIN_BASIS)
+	{
+		return "UNCOIN_BASIS";
+	}	
 	else 
 	{
 		CV_Assert(0, "Unknown srface type");

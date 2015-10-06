@@ -10,7 +10,7 @@ namespace molecule_descriptor
 
 template <typename Graph, typename CoordMap, typename DoublePropMap, typename DistVertMap, typename CVPCAPropMap>
 void FindVectorsForProjection(const Graph& vertices_graph, const CoordMap& coord_map, 
-	const std::vector<DoublePropMap>& scale_space, 
+	const std::vector<DoublePropMap>& functions, 
 	const DistVertMap& dist_vert_map, const double dist_thresh,
 	CVPCAPropMap& scale_space_projecter)
 {
@@ -49,7 +49,7 @@ void FindVectorsForProjection(const Graph& vertices_graph, const CoordMap& coord
 		for (auto neighb_vertice = vertices_withit_dist.begin(), end_neighb_vertices =  vertices_withit_dist.end(); 
 			neighb_vertice != end_neighb_vertices; ++neighb_vertice)
 		{
-			DataFiller()(coord_map, kCoordMult, scale_space, kPropMult, 
+			DataFiller()(coord_map, kCoordMult, functions, kPropMult, 
 				*neighb_vertice, curr_vert_in_mask, data);
 			++curr_vert_in_mask;
 		}	
@@ -81,7 +81,7 @@ void FindVectorsForProjection(const Graph& vertices_graph, const CoordMap& coord
 			prop_base[prop_ind].create(1, 3 + ISingularPointsFinder::SURF_PROPS_NUM);
 			//parallel shift of vector to the origin of the new coordinate system
 			pca.mean.copyTo(prop_base[prop_ind]);
-			prop_base[prop_ind](0, prop_ind + 3) = scale_space[prop_ind][*curr_vertice] * kPropMult;
+			prop_base[prop_ind](0, prop_ind + 3) = functions[prop_ind][*curr_vertice] * kPropMult;
 			pca.project(prop_base[prop_ind], proj_prop_base[prop_ind]);
 			//make projection orthogonal to each of the projected coordinate vectors
 			for (int coord_ind = 0; coord_ind < 3; ++coord_ind)
@@ -93,74 +93,147 @@ void FindVectorsForProjection(const Graph& vertices_graph, const CoordMap& coord
 		//calculate new property vector as sum of orthogonalized projected vectors
 		cv::Mat_<double> new_prop(1, 4);
 		new_prop.setTo(0);
-		/*for (int prop_coord_ind = 0; prop_coord_ind < 4; ++prop_coord_ind)
-		{
-			std::cout << proj_prop_base[0](0, prop_coord_ind) << " ";
-		}
-		std::cout << std::endl;*/
+
 		for (int prop_ind = 0; prop_ind <  ISingularPointsFinder::SURF_PROPS_NUM; ++prop_ind)
 		{
-			new_prop += proj_prop_base[prop_ind];
-			for (int prop_coord_ind = 0; prop_coord_ind < 4; ++prop_coord_ind)
-			{
-				//std::cout << proj_prop_base[prop_ind](0, prop_coord_ind) / proj_prop_base[0](0, prop_coord_ind) << " ";
-			}
-			//std::cout << std::endl;
+			new_prop += proj_prop_base[prop_ind];			
 		}
-		/*cv::Mat_<double> data_basis(1, 3 + ISingularPointsFinder::PROPS_NUM), proj_basis;
-		DataFiller()(coord_map, 1.0, scale_space[curr_level], 0.0, *curr_vertice, 0, data_basis);
-		cv::Mat_<double> curr_data(1, 3 + ISingularPointsFinder::PROPS_NUM), proj_curr;
-		DataFiller()(coord_map, 1.0, scale_space[curr_level], 1.0, *curr_vertice, 0, curr_data);
-		pca.project(data_basis, proj_basis);
-		pca.project(curr_data, proj_curr);
-		cv::Mat_<double> new_prop = proj_curr - proj_basis;
-		*/
-		/*std::cout << pca.eigenvectors << "\n" << pca.mean << "\n" << new_prop << "\n";
-		for (int coord_ind = 0; coord_ind < 3; ++coord_ind)
-		{
-			std::cout << proj_coord_base[coord_ind] << "\n";
-		}	
-		std::cout << "\n";*/
-
+		
 		cv::Mat_<double> vect_to_project;
 		scale_space_projecter[*curr_vertice].pca = pca;
 		scale_space_projecter[*curr_vertice].vect_to_project_on = new_prop;
-		//pca.backProject(new_prop, vect_to_project);
-		//vect_to_project -= pca.mean;
-
-		//for (int prop = 0; prop < ISingularPointsFinder::PROPS_NUM; ++prop)
-		//{
-		//	scale_space_vect_to_project[curr_level][prop][*curr_vertice] = vect_to_project(0, prop + 3);
-		//}
-
-		////check
-		//cv::Mat_<double> vect_data(1, 3 + ISingularPointsFinder::PROPS_NUM);
-		//for (auto neighb_it = adjacent_vertices(*curr_vertice, vertices_graph).first,
-		//	end_neighb = adjacent_vertices(*curr_vertice, vertices_graph).second; neighb_it != end_neighb; ++neighb_it)
-		//{
-		//	DataFiller()(coord_map, kCoordMult, scale_space[curr_level], kPropMult, *neighb_it, 0, vect_data);
-		//	cv::Mat_<double> vect_projected_data;
-		//	pca.project(vect_data, vect_projected_data);
-		//	double prod1 = 0;
-		//	double norm1 = 0;
-		//	for (int coord = 0; coord < 4; ++coord)
-		//	{
-		//		prod1 += vect_projected_data(0, coord) * new_prop(0, coord);
-		//		norm1 += new_prop(0, coord) * new_prop(0, coord);
-		//	}
-		//	prod1 /= norm1;
-		//	vect_data -= pca.mean;
-		//	double prod = 0;
-		//	double norm = 0;
-		//	for (int coord = 0; coord < ISingularPointsFinder::PROPS_NUM; ++coord)
-		//	{
-		//		prod += vect_data(0, coord + 3) * vect_to_project(0, coord + 3);
-		//		norm += vect_to_project(0, coord + 3) * vect_to_project(0, coord + 3);
-		//	}
-		//	prod/= sqrt(norm);
-		//	std::cout << prod << " " << prod1 << "\n";
-		//}
 	}
 }
 
+
+template <typename Graph, typename DoublePropMap, typename DistVertMap, typename CVPCAPropMap>
+void SetPCAAsMeanOfFunction(const Graph& vertices_graph, const std::vector<DoublePropMap>& functions, 
+							  const DistVertMap& dist_vert_map, const double dist_thresh,
+							  CVPCAPropMap& scale_space_projecter)
+{
+	typedef typename boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
+	struct DataFiller
+	{
+		void operator()(const std::vector<DoublePropMap>& props,
+			const VertexDescriptor curr_vert, const int data_row, Mat_<double>& data) const
+		{
+			for (int col = 0; col < ISingularPointsFinder::SURF_PROPS_NUM; ++col)
+			{
+				data(data_row, col) = props[col][curr_vert];
+			}
+		}
+	};
+	std::vector<VertexDescriptor> vertices_withit_dist;
+	scale_space_projecter.SetGraph(vertices_graph);
+
+	for (auto curr_vertice = vertices(vertices_graph).first, end_vertices = vertices(vertices_graph).second; 
+		curr_vertice != end_vertices; ++curr_vertice)
+	{
+		//find vertices that we need to process
+		GetVerticesWithinDistPlusAdjacent(*curr_vertice, vertices_graph, dist_vert_map, dist_thresh, vertices_withit_dist);
+		//fill data
+		cv::Mat_<double> data(vertices_withit_dist.size(), ISingularPointsFinder::SURF_PROPS_NUM);
+		size_t curr_vert_in_mask = 0;
+		for (auto neighb_vertice = vertices_withit_dist.begin(), end_neighb_vertices =  vertices_withit_dist.end(); 
+			neighb_vertice != end_neighb_vertices; ++neighb_vertice)
+		{
+			DataFiller()(functions, *neighb_vertice, curr_vert_in_mask, data);
+			++curr_vert_in_mask;
+		}	
+		//calculate coordiantes
+		cv::Mat_<double> mean(1, ISingularPointsFinder::SURF_PROPS_NUM);
+		mean.setTo(0);
+		cv::PCA pca(data, mean, CV_PCA_DATA_AS_ROW, 1);
+		cv::Mat_<double> vect_to_project_on(1, 1);
+		vect_to_project_on.setTo(1);
+		scale_space_projecter[*curr_vertice].pca = pca;
+		scale_space_projecter[*curr_vertice].vect_to_project_on = vect_to_project_on;
+	}
+}
+
+//functions for PCA projections
+//this is not for original vectors but for the difference of original vector
+template <class PropMap, class CoordMap, class PCAProjecter, class VertDescr>
+double ProjectPCADiffDifferentVert(const std::vector<PropMap>& prop_map, const CoordMap& coord_map, const VertDescr vert,
+								   const PCAProjecter& projecter)
+{
+	if (projecter.pca.mean.total() == prop_map.size() + 3)
+	{
+		cv::Mat_<double> prop_vect(1, prop_map.size() + 3);
+		prop_vect(0, 0)=coord_map[vert].x;
+		prop_vect(0, 1)=coord_map[vert].y;
+		prop_vect(0, 2)=coord_map[vert].z;
+		for (int ind = 3; ind < 3 + prop_map.size(); ++ind)
+		{
+			prop_vect(0, ind) = prop_map[ind - 3][vert];
+		}
+		prop_vect += projecter.pca.mean;
+		cv::Mat_<double> proj_prop_vect;
+		projecter.pca.project(prop_vect, proj_prop_vect);
+		double res = proj_prop_vect.dot(projecter.vect_to_project_on)/ cv::norm(projecter.vect_to_project_on);
+		return res;
+	}
+	else if (projecter.pca.mean.total() == prop_map.size())
+	{
+		cv::Mat_<double> prop_vect(1, prop_map.size());
+
+		for (int ind = 0; ind < prop_map.size(); ++ind)
+		{
+			prop_vect(0, ind) = prop_map[ind][vert];
+		}
+		prop_vect += projecter.pca.mean;
+		cv::Mat_<double> proj_prop_vect;
+		projecter.pca.project(prop_vect, proj_prop_vect);
+		double res = proj_prop_vect.dot(projecter.vect_to_project_on)/ cv::norm(projecter.vect_to_project_on);
+		return res;
+	}
+	CV_Assert(0);
+}
+
+template <class PropMap, class CoordMap, class PCAProjMap, class VertDescr>
+double ProjectPCADiff(const std::vector<PropMap>& prop_map, const CoordMap& coord_map, const PCAProjMap& proj_map, const VertDescr vert)
+{
+	return ProjectPCADiffDifferentVert(prop_map, coord_map, vert, proj_map[vert]);
+}
+
+template <class PropMap, class CoordMap, class PCAProjecter,  class VertDescr>
+double ProjectPCADifferentVert(
+	const std::vector<PropMap>& prop_map, const CoordMap& coord_map, const VertDescr vert, const PCAProjecter& projecter)
+{
+	if (projecter.pca.mean.total() == prop_map.size() + 3)
+	{
+		cv::Mat_<double> prop_vect(1, prop_map.size() + 3);
+		prop_vect(0, 0)=coord_map[vert].x;
+		prop_vect(0, 1)=coord_map[vert].y;
+		prop_vect(0, 2)=coord_map[vert].z;
+		for (int ind = 3; ind < 3 + prop_map.size(); ++ind)
+		{
+			prop_vect(0, ind) = prop_map[ind - 3][vert];
+		}
+		cv::Mat_<double> proj_prop_vect;
+		projecter.pca.project(prop_vect, proj_prop_vect);
+		double res = proj_prop_vect.dot(projecter.vect_to_project_on)/ cv::norm(projecter.vect_to_project_on);
+		return res;
+	}
+	else if (projecter.pca.mean.total() == prop_map.size())
+	{
+		cv::Mat_<double> prop_vect(1, prop_map.size());
+
+		for (int ind = 0; ind < prop_map.size(); ++ind)
+		{
+			prop_vect(0, ind) = prop_map[ind][vert];
+		}
+		cv::Mat_<double> proj_prop_vect;
+		projecter.pca.project(prop_vect, proj_prop_vect);
+		double res = proj_prop_vect.dot(projecter.vect_to_project_on)/ cv::norm(projecter.vect_to_project_on);
+		return res;
+	}
+	CV_Assert(0);
+}
+
+template <class PropMap, class CoordMap, class PCAProjMap, class VertDescr>
+double ProjectPCA(const std::vector<PropMap>& prop_map, const CoordMap& coord_map, const PCAProjMap& proj_map, const VertDescr vert)
+{
+	return ProjectPCADifferentVert(prop_map, coord_map, vert, proj_map[vert]);
+}
 }

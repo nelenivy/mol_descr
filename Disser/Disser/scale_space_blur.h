@@ -65,7 +65,7 @@ public:
 		{
 			m_filtered_before_postproc.resize(levels_num);
 		}
-#pragma omp parallel for
+//#pragma omp parallel for
 		for (int curr_level = 0; curr_level < levels_num; ++curr_level)
 		{
 			if (post_filter) 
@@ -78,7 +78,7 @@ public:
 				m_filtered_before_postproc[curr_level] : filtered_prop_map_vect[curr_level];
 			GaussianKernelWeightedDist<double> av_kernel(curr_sigma);
 			//GaussianKernelWeightedDistTable<double> av_kernel(curr_sigma, m_exp_approx);
-			FilterMeshWeightedFunc(vertices_graph, tr_graph, vert_vert_dist, vert_tr_dist, prop_map_vect, true, 
+			FilterMeshWeightedFuncMultiThread(vertices_graph, tr_graph, vert_vert_dist, vert_tr_dist, prop_map_vect, true, 8,
 				av_kernel, filtered_output);
 			//FilterGraphDist(av_kernel, vertices_graph, coord_map, prop_map_vect, filtered_output);///////////
 

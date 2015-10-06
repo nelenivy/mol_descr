@@ -117,6 +117,10 @@ public:
 	{
 		std::fill(m_container.begin(), m_container.end(), ContValueType());
 	}
+	void SetTo(const ContValueType val)
+	{
+		std::fill(m_container.begin(), m_container.end(), val);
+	}
 	size_t Size() const
 	{
 		return m_container.size();

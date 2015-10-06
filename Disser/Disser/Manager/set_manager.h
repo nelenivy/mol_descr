@@ -50,6 +50,7 @@ private:
 	bool m_use_triples;
 	int m_pairs_levels_overlap;
 	bool m_write_pairs;
+	bool m_extend_distances;
 	MoleculeManager m_molecule_manager;
 	std::vector<double> m_distances;
 	std::vector<double> m_dist_thresholds;

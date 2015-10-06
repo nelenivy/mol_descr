@@ -6,11 +6,11 @@
 namespace molecule_descriptor
 {
 
-template <typename PropMap, typename TransformFunc>
-class ProxyPropMap
+template <typename PropMap, typename TransformFunc, typename DataKeeper>
+class ProxyPropMapBase
 	: boost::put_get_helper< 
 	typename std::result_of<TransformFunc(typename boost::property_traits<PropMap>::reference)>::type ,
-	ProxyPropMap<PropMap, TransformFunc>>
+	ProxyPropMapBase<PropMap, TransformFunc, DataKeeper>>
 {
 public:
 	typedef TransformFunc TransformFuncType;
@@ -22,25 +22,52 @@ public:
 	typedef OutRef&													reference;
 	typedef typename boost::property_traits<PropMap>::category		category;
 
-	ProxyPropMap(PropMap& prop_map, const TransformFunc func) : m_prop_map(prop_map), m_func(func) {}
-
 	OutRef& operator[](const key_type key)
 	{
-		return m_func(m_prop_map[key]);
+		DataKeeper& data_keeper = static_cast<DataKeeper&>(*this);
+		return data_keeper.m_func(data_keeper.m_prop_map[key]);
 	}
 	const OutRef& operator[](const key_type key) const
 	{
-		return const_cast<const OutRef&>(m_func(m_prop_map[key]));
+		const DataKeeper& data_keeper = static_cast<const DataKeeper&>(*this);
+		return const_cast<const OutRef&>(data_keeper.m_func(data_keeper.m_prop_map[key]));
 	}
+private:
+};
+
+
+template <typename PropMap, typename TransformFunc>
+class ProxyPropMapVal : public ProxyPropMapBase<PropMap, TransformFunc, ProxyPropMapVal<PropMap, TransformFunc>>
+{
+public:
+	ProxyPropMapVal() {}
+	ProxyPropMapVal(PropMap& prop_map, const TransformFunc func) : m_prop_map(prop_map), m_func(func) {}
+	friend class ProxyPropMapBase<PropMap, TransformFunc, ProxyPropMapVal<PropMap, TransformFunc>>;
+private:
+	PropMap m_prop_map;
+	TransformFunc m_func;
+};
+template <typename PropMap, typename TransformFunc>
+class ProxyPropMapRef : public ProxyPropMapBase<PropMap, TransformFunc, ProxyPropMapRef<PropMap, TransformFunc>>
+{
+public:
+	ProxyPropMapRef(PropMap& prop_map, const TransformFunc func) : m_prop_map(prop_map), m_func(func) {}
+	friend class ProxyPropMapBase<PropMap, TransformFunc, ProxyPropMapRef<PropMap, TransformFunc>>;
 private:
 	PropMap& m_prop_map;
 	TransformFunc m_func;
 };
 
 template <class PropMap, class TransformFunc>
-ProxyPropMap<PropMap, TransformFunc> GetProxyPropMap(PropMap& prop_map, const TransformFunc& transform_func)
+ProxyPropMapRef<PropMap, TransformFunc> GetProxyPropMapRef(PropMap& prop_map, const TransformFunc& transform_func)
 {
-	return ProxyPropMap<PropMap, TransformFunc>(prop_map, transform_func);
+	return ProxyPropMapRef<PropMap, TransformFunc>(prop_map, transform_func);
+}
+
+template <class PropMap, class TransformFunc>
+ProxyPropMapVal<PropMap, TransformFunc> GetProxyPropMapVal(PropMap& prop_map, const TransformFunc& transform_func)
+{
+	return ProxyPropMapVal<PropMap, TransformFunc>(prop_map, transform_func);
 }
 
 struct IdenticalTransformFunc
@@ -58,8 +85,8 @@ struct IdenticalTransformFunc
 };
 
 template <class PropMap>
-ProxyPropMap<PropMap, IdenticalTransformFunc> GetPropMapReference(PropMap& prop_map)
+ProxyPropMapRef<PropMap, IdenticalTransformFunc> GetPropMapReference(PropMap& prop_map)
 {
-	return ProxyPropMap<PropMap, IdenticalTransformFunc>(prop_map, IdenticalTransformFunc());
+	return ProxyPropMapRef<PropMap, IdenticalTransformFunc>(prop_map, IdenticalTransformFunc());
 }
 }

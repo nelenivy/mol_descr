@@ -20,7 +20,7 @@ class SngPtsFinderScaleSpace : public ISingularPointsFinder
 {
 public:
 	SngPtsFinderScaleSpace() { }
-	virtual void Process(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
+	virtual void CalcSingPtsFromCalculatedProperties(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
 		const std::vector<cv::Point3i>& triangles, 
 		const std::vector<std::pair<cv::Point3d, double>>& charges, const std::vector<std::pair<cv::Point3d, double>>& wdv_radii,
 		const bool calc_prop_as_average);
@@ -55,27 +55,56 @@ public:
 			prop.insert(prop.end(), m_vertex_lennard_jones_map.begin(),m_vertex_lennard_jones_map.end());
 		}	
 	}
-	virtual void SetMeanAndSigma(std::vector<std::vector<double>> mean_and_sigma)
+	virtual void SetMeanAndSigma(const std::vector<std::vector<double>>& mean_and_sigma)
 	{
 		m_mean_and_sigma = mean_and_sigma;
 	}
 	virtual void GetSegmentedVertices(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_segm_numbers)
 	{
 	};
-	void InitParams(int argc, char** argv);
+	virtual size_t GetScaleSpaceLevelsNum() const 
+	{
+		return m_scale_space_levels_num;
+	}
+	virtual size_t GetDetectorFuncLevelsNum() const 
+	{
+		return m_detector_function_levels_num;
+	}
+
+	virtual void InitParams(int argc, char** argv);
+
+	virtual void SetScaleSpace(const std::vector<std::vector<std::vector<double>>>& blurred_functions);
+	virtual void SetDetectorFunction(const std::vector<std::vector<std::vector<double>>>& detector_functions);
+	virtual void SetEigRatio(const std::vector<std::vector<double>>& eig_functions);
 
 private:
 	Mesh& GetMesh(){ return const_cast<Mesh&>(m_mesh_keeper.GetMesh());/*m_filtered_mesh;*/}
-	const Mesh& GetMesh() const { return const_cast<const SngPtsFinderScaleSpace*>(this)->GetMesh();}
+	const Mesh& GetMesh() const { return const_cast<SngPtsFinderScaleSpace*>(this)->GetMesh();}
+	const VerticesGraph& Vertices() const {  return GetMesh().vertices;}
+	const TrianglesGraph& Triangles() const {  return GetMesh().triangles;}
 	void Clear();//call before processing new data
-	void CalculateVerticesSurfaceType(const Mesh& mesh);
-	void CalcSingPtsFromCurvatureScales(const Mesh& mesh);
+	void CalculateVerticesSurfaceType();
+	void CalcSingPtsFromCurvatureScales();
 	void CalculatePropsInSingPts(const bool calc_prop_as_average);
-	void CalcCurvature(const Mesh& mesh);
-	void CalcTangentBasis(const Mesh& mesh);
-	void CalcScaleSpacePropsHessianRatio(const Mesh& mesh);
-	void CalcHessianOfProjectedLog(const Mesh& mesh);
-	void CalculateDistanceMaps(const Mesh& mesh);
+	void CalcCurvature();
+	void GetCoordinateMaps();
+	void CalcTangentBasisConsistent();
+	void CalcTangentBasisFast();
+	void CalcScaleSpacePropsHessianRatio();
+	void CalcHessianOfProjectedLog();
+	void CalculateDistanceMaps();
+
+	void ResccaleInputFunctions();
+	void CalculateDOG();
+	void CalculateLOG();
+
+	void CalculateProjectedVectors();
+	void FindSingPtsAsMaximumsOfScaleSpace();
+	void FindSingPtsAsSeparateMaximumsOfLOG();
+	void FindSingPtsAsCombinedMaximumsOfLOG();
+	void FilterByEigenvaluesRatio();
+	void FilterByNormedLogValue();
+
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesTypeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> VetrticesCurvMap;
@@ -83,6 +112,7 @@ private:
 
 	typedef ContPropMap<SingularPointsGraph, std::vector<double>, VERTEX> SingPtsDoublePropMap;
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> DoubleVertGraphProp;
+	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> UInt8VertGraphProp;
 
 	MeshKeeper m_mesh_keeper;
 	DoubleVertGraphProp m_mean_curvature;
@@ -101,6 +131,7 @@ private:
 
 	int m_sing_pts_levels_num;
 	int m_scale_space_levels_num;
+	int m_detector_function_levels_num;
 	int m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls;
 	bool m_detect_blobs;
 	bool m_use_DOG_as_LOG_approximation;
@@ -111,13 +142,16 @@ private:
 	double m_init_curv_sigma;
 	double m_sigma_max;
 
-	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
-	typedef ProxyPropMap<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
+	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
+	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
+	typedef ProxyPropMapVal<boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<MeshTriangle>> CoordMapTriangle;
 	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> m_scale_space_blurrer;
 	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space_diff;
-
+	bool m_scale_space_diff_calculated;
 	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space;
+	bool m_scale_space_calculated;
 	std::vector<DoubleVertGraphProp> m_input_prop_map;
+	bool m_hessian_ratio_calculated;
 
 	struct PCAProjecter
 	{
@@ -126,6 +160,8 @@ private:
 	};
 	typedef ContPropMap<VerticesGraph, std::vector<PCAProjecter>, VERTEX> PCAProjecterMap;
 	std::vector<PCAProjecterMap> m_scale_space_projecter;
+	bool m_use_central_projector;
+	bool m_scale_extr;
 
 	std::vector<DoubleVertGraphProp> m_detector_function_projected;
 	std::vector<DoubleVertGraphProp> m_scale_space_projected;
@@ -142,11 +178,28 @@ private:
 	std::vector<DoubleVertGraphProp> m_projected_grad_y;
 	std::vector<DoubleVertGraphProp> m_projected_grad_norm;
 	std::vector<DoubleVertGraphProp> m_props_hessian_ratio_of_proj;
+	double m_ratio_thresh;
 
 	std::vector<DoubleVertGraphProp> m_props_hessian_ratio_of_proj_LOG;
 	//distance maps
 	cv::Mat_<double> m_vert_vert_dist;
 	cv::Mat_<double> m_vert_tr_dist;
+
+	CoordMap m_coord_map;
+	NormalMap m_norm_map;
+	CoordMapTriangle coord_map_tr;
+	boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map;
+	boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type coord_3d_map_tr;
+
+	enum ChannelsCombination
+	{
+		PCA, NORM, DETECTOR_NORM
+	};
+
+	ChannelsCombination m_channel_combination;
+
+	/*UInt8VertGraphProp*/
+	DoubleVertGraphProp m_uncoincided_vertices;
 };
 
 }

@@ -128,6 +128,9 @@
     <ClInclude Include="GraphLib\coordinates_transform.h">
       <Filter>GraphLib</Filter>
     </ClInclude>
+    <ClInclude Include="GraphLib\interpolator.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

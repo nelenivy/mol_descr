@@ -48,8 +48,8 @@ public:
 	void DeleteSmallSegments(const GraphType& graph, const PropType val, const PropType value, 
 		const PropType null_val, const size_t size_thresh, PropertyMap& prop_map);
 private:
-	ConnectedComponentsSegmentator(const ConnectedComponentsSegmentator&);
-	ConnectedComponentsSegmentator& operator=(const ConnectedComponentsSegmentator&);
+	//ConnectedComponentsSegmentator(const ConnectedComponentsSegmentator&);
+	//BConnectedComponentsSegmentator& operator=(const ConnectedComponentsSegmentator&);
 	/** use only pixels with predefined value or all pixels*/
 	enum eSegmentValues { ONE_VALUE, ALL_VALUES };
 	/** \brief Implementation of segmentation*/ 	

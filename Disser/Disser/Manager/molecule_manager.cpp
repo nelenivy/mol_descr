@@ -43,25 +43,42 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 		for (int prop_type = ISingularPointsFinder::FIRST_SURF_PROP; prop_type < ISingularPointsFinder::SURF_PROPS_NUM; ++prop_type)
 		{
 			WriteSurfaceWithDblProp(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
-			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
 		}
-		for (int prop_type = ISingularPointsFinder::FIRST_LOG_PROP; prop_type <= ISingularPointsFinder::LAST_LOG_PROP; ++prop_type)
+
+		if (!m_use_calculated_scale_space)
 		{
-			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			for (int prop_type = ISingularPointsFinder::FIRST_SURF_PROP; prop_type < ISingularPointsFinder::SURF_PROPS_NUM; ++prop_type)
+			{
+				WriteSurfaceWithDblProp(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+				WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			}
 		}
-		for (int prop_type = ISingularPointsFinder::FIRST_PCA_PROP; prop_type <= ISingularPointsFinder::LAST_PCA_PROP; ++prop_type)
+
+		if (!m_use_calculated_detector_function)
 		{
-			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			for (int prop_type = ISingularPointsFinder::FIRST_LOG_PROP; prop_type <= ISingularPointsFinder::LAST_LOG_PROP; ++prop_type)
+			{
+				WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			}
 		}
-		for (int prop_type = ISingularPointsFinder::FIRST_EIG_PROP; prop_type <= ISingularPointsFinder::LAST_EIG_PROP; ++prop_type)
+
+		if (!m_use_calculated_eig_ratio)
 		{
-			WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			for (int prop_type = ISingularPointsFinder::FIRST_PCA_PROP; prop_type <= ISingularPointsFinder::LAST_PCA_PROP; ++prop_type)
+			{
+				WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			}
+			for (int prop_type = ISingularPointsFinder::FIRST_EIG_PROP; prop_type <= ISingularPointsFinder::LAST_EIG_PROP; ++prop_type)
+			{
+				WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
+			}
+			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);
+			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_GRAD);
+			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG);
+			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG_LOG);
 		}
 		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_LOG);
-		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);
-		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_GRAD);
-		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG);
-		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG_LOG);
+		WriteSurfaceWithDblProp(ISingularPointsFinder::UNCOIN_BASIS);
 	}
 	else
 	{
@@ -1116,7 +1133,42 @@ void MoleculeManager::CalculateSingularPoints(const bool calc_as_average)
 	{
 		m_sing_pts_finder->SetMeanAndSigma(m_mean_and_sigma);
 	}
-	m_sing_pts_finder->Process(vertices, normals, triangles, charges, wdv_radii, calc_as_average);
+	m_sing_pts_finder->CalcOnlyProps(vertices, normals, triangles, charges, wdv_radii);
+
+	if (m_use_calculated_scale_space)
+	{
+		std::vector<std::vector<std::vector<double>>> scale_space;
+		 ReadScaleSpaceFunctions(m_sing_pts_finder->GetScaleSpaceLevelsNum(),
+			ISingularPointsFinder::FIRST_SURF_PROP, 
+			static_cast<ISingularPointsFinder::SurfProperty>(ISingularPointsFinder::SURF_PROPS_NUM - 1),
+			scale_space); 
+		m_sing_pts_finder->SetScaleSpace(scale_space);
+	}
+	if (m_use_calculated_detector_function)
+	{
+		std::vector<std::vector<std::vector<double>>> detector_function;
+		ReadScaleSpaceFunctions(m_sing_pts_finder->GetDetectorFuncLevelsNum(),
+			ISingularPointsFinder::FIRST_LOG_PROP, 
+			ISingularPointsFinder::LAST_LOG_PROP,
+			detector_function); 
+		m_sing_pts_finder->SetDetectorFunction(detector_function);
+	}
+	if (m_use_calculated_eig_ratio)
+	{
+		std::vector<std::vector<std::vector<double>>> eig_ratio_lev;
+		ReadScaleSpaceFunctions(m_sing_pts_finder->GetDetectorFuncLevelsNum(),
+			ISingularPointsFinder::PCA_EIG, 
+			ISingularPointsFinder::PCA_EIG,
+			eig_ratio_lev); 
+		std::vector<std::vector<double>> eig_ratio(eig_ratio_lev.size());
+
+		for (size_t ind = 0; ind < eig_ratio_lev.size(); ++ind)
+		{
+			eig_ratio[ind] = eig_ratio_lev[ind][0];
+		}
+		m_sing_pts_finder->SetEigRatio(eig_ratio);
+	}
+	m_sing_pts_finder->CalcSingPtsFromCalculatedProperties(vertices, normals, triangles, charges, wdv_radii, calc_as_average);
 	m_sing_pts_finder->GetNonMarkedSingularPoints(m_non_marked_singular_points);
 	m_sing_pts_finder->GetNonMarkedSingularPointsLevels(m_non_marked_singular_points_levels);
 }
@@ -1244,6 +1296,39 @@ void MoleculeManager::WriteSurfaceWithDblPropLevels(const ISingularPointsFinder:
 			Extensions::SurfWithDblPropLev() + s.str();
 		WriteInterval(vert_with_prop_file, vertices_with_dbl_prop_lev[lev].begin(), vertices_with_dbl_prop_lev[lev].end());
 	}	
+}
+
+void MoleculeManager::ReadScaleSpaceFunctions(const size_t levels_num,
+	const ISingularPointsFinder::SurfProperty first_prop, 
+	const ISingularPointsFinder::SurfProperty last_prop,
+	std::vector<std::vector<std::vector<double>>>& scale_space)
+{
+	std::vector<std::vector<std::vector<std::pair<cv::Point3d, double>>>> vertices_with_dbl_prop_lev(levels_num);
+	scale_space.resize(levels_num);
+	for (size_t lev = 0; lev < levels_num; ++lev)
+	{
+		vertices_with_dbl_prop_lev[lev].resize(last_prop - first_prop + 1);
+		scale_space[lev].resize(last_prop - first_prop + 1);
+
+		for (int curr_prop = first_prop; curr_prop <= last_prop; ++curr_prop)
+		{
+			auto& output = vertices_with_dbl_prop_lev[lev][curr_prop - first_prop];
+			std::stringstream s;
+			s << lev;
+			const std::string vert_with_prop_file = m_curr_file_prefix + 
+				SurfPropertyName(static_cast<ISingularPointsFinder::SurfProperty>(curr_prop))+ 
+				Extensions::SurfWithDblPropLev() + s.str();
+			ReadVector(vert_with_prop_file, output);
+
+			auto& input = scale_space[lev][curr_prop - first_prop];
+			input.resize(output.size());
+
+			for (size_t ind = 0; ind < output.size(); ++ind)
+			{
+				input[ind] = output[ind].second;
+			}
+		}
+	} 
 }
 
 void MoleculeManager::ReadSurfaceWithTypes(std::vector<std::pair<cv::Point3d, size_t>>& vertices_with_types)

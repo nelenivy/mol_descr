@@ -318,7 +318,7 @@ void SetManager::CalculateThresholdLevels()
 	m_dist_thresholds_levels.resize(levels_num);
 	m_high_thresholds[levels_num - 1] = std::numeric_limits<double>::max();
 	CV_Assert(m_distance_quantile_for_thresh <= m_distance_interval_levels);
-
+	std::vector<double> max_elements(levels_num);
 	for (int level = levels_num - 1; level >= 0; --level)
 	{
 		//delete too large distances
@@ -327,21 +327,52 @@ void SetManager::CalculateThresholdLevels()
 		{
 			return dist < m_high_thresholds[level];
 		});
+		const int max_el_ind = static_cast<int>(0.98 * m_distances_levels[level].size());
+		std::nth_element(m_distances_levels[level].begin(), m_distances_levels[level].begin() + 
+			max_el_ind, m_distances_levels[level].end());
+		const double max_el = m_distances_levels[level][max_el_ind];
+		max_elements[level] = max_el;
 		m_distances_levels[level].erase(first_elem_higher_than_thresh, m_distances_levels[level].end());
-		std::vector<double> thresh_levels, thresh_quantiles;
+		std::vector<double> thresh_levels;
 		CalculateThresholdsLevels(m_distance_interval_levels, 0.02, m_distances_levels[level], thresh_levels);
-		CalculateThresholdsQuantiles(m_distance_interval_levels, m_distances_levels[level], thresh_quantiles);
-		const double alpha = 1.0;
+
 		m_dist_thresholds_levels[level].resize(m_distance_interval_levels);
 		for (size_t ind = 0; ind < m_distance_interval_levels; ++ind)
 		{
-			m_dist_thresholds_levels[level][ind] = alpha * thresh_levels[ind] + (1.0  - alpha) * thresh_quantiles[ind];
+			m_dist_thresholds_levels[level][ind] = thresh_levels[ind];
 		}
 		if (level > 0 /*&& level < 8*/)
 		{
 			m_high_thresholds[level - 1] = m_dist_thresholds_levels[level][m_distance_quantile_for_thresh];
 		}
+		std::cout << max_el / (2.0 * m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
+			m_dist_thresholds_levels[level][m_distance_interval_levels - 2]) * m_distance_interval_levels << " ";
 	}
+	if (m_extend_distances)
+	{
+		int ext_el_num = 0;
+		for (int level = levels_num - 1; level >= 0; --level)
+		{
+			const int curr_ext_el_num = Round(max_elements[level] / (2.0 * m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
+				m_dist_thresholds_levels[level][m_distance_interval_levels - 2]) * m_distance_interval_levels);
+
+			ext_el_num = std::max(ext_el_num, curr_ext_el_num);
+		}
+		for (int level = levels_num - 1; level >= 0; --level)
+		{
+			const double curr_diff = m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
+				m_dist_thresholds_levels[level][m_distance_interval_levels - 2];
+			for (int el_num = m_distance_interval_levels; el_num < ext_el_num; ++el_num)
+			{
+				const double curr_ext_el = m_dist_thresholds_levels[level][m_distance_interval_levels - 1] + curr_diff * (el_num - m_distance_interval_levels + 1);
+				m_dist_thresholds_levels[level].push_back(curr_ext_el);
+			}
+			m_high_thresholds[level] = m_dist_thresholds_levels[level][ext_el_num - 1] + curr_diff;
+		}
+
+		m_distance_interval_levels = ext_el_num;
+	}
+	std::cout << m_distance_interval_levels << "\n";
 }
 
 void SetManager::ProcessTriples(const bool calculate)
@@ -680,7 +711,7 @@ void SetManager::ProcessSVMClassificationL0()
 		double diff = std::numeric_limits<double>::max();
 	    int non_changed_iterations = 0;
 
-		while (diff > 0.000005 && non_changed_iterations < 5 )
+		while (diff > 0.000005 && non_changed_iterations < 10 )
 		{
 			typedef shark::RealVector data_type;
 			std::vector<data_type> temp(mat_to_use.rows, data_type(weights.size()));
@@ -888,6 +919,7 @@ void SetManager::ReadParamsFromCommandLine(int argc, char** argv)
 
 	ReadParamFromCommandLineWithDefault(argc, argv, "-levels_overlap", m_pairs_levels_overlap, 1);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-write_pairs", m_write_pairs, true);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-extend_distances", m_extend_distances, false);
 	m_inited = true;
 }
 
