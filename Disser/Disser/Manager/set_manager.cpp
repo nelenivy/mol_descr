@@ -198,7 +198,22 @@ void SetManager::ProcessPairsLevels(const bool calculate)
 	}
 
 	//CalculateDistThresholdsKMeans();
-	CalculateThresholdLevels();
+	if (!m_use_linear_function)
+	{
+		CalculateThresholdLevels();
+	}
+	else
+	{
+		CalcDistanceThresholdByLinearFunction();
+	}
+	WriteInterval(m_mol_folder + m_mol_prefix + "_thresholds.txt", m_high_thresholds.begin(), m_high_thresholds.end());
+	/*std::cout << m_high_thresholds.size() << "\n";
+	for (int ind = 0; ind < m_high_thresholds.size(); ++ind)
+	{
+		std::cout << m_high_thresholds[ind] << " ";
+	}
+	std::cout << "\n";
+	std::cout.flush();*/
 	m_molecule_manager.SetDistLevelsThresholds(m_dist_thresholds_levels, m_high_thresholds);
 	std::vector<double> levels_scales(m_dist_thresholds_levels.size());
 	levels_scales[0] = 1.0;
@@ -310,6 +325,24 @@ void SetManager::ProcessPairs(const bool calculate)
 	WriteMatrix(m_md_matrix, m_mol_folder + m_mol_prefix + Extensions::PairsMDMatrix());
 }
 
+void SetManager::CalcDistanceThresholdByLinearFunction()
+{
+	std::vector<double> sigma_levels = m_molecule_manager.GetSigmaValues();
+	const int levels_num = m_distances_levels.size();
+	m_high_thresholds.resize(levels_num);
+	m_dist_thresholds_levels.resize(levels_num);
+
+	for (int lev = 0; lev < levels_num; ++lev)
+	{
+		m_high_thresholds[lev] = m_add_for_thresh + m_mult_for_dist_thresh * sigma_levels[lev + (m_pairs_levels_overlap + 1) / 2];
+		m_dist_thresholds_levels[lev].resize(m_distance_interval_levels);
+
+		for (int curr_dist_thresh = 0; curr_dist_thresh < m_distance_interval_levels; ++curr_dist_thresh)
+		{
+			m_dist_thresholds_levels[lev][curr_dist_thresh] = (curr_dist_thresh + 1) * m_high_thresholds[lev] / (m_distance_interval_levels + 1);
+		}
+	}
+}
 void SetManager::CalculateThresholdLevels()
 {
 	const int levels_num = m_distances_levels.size();
@@ -320,18 +353,20 @@ void SetManager::CalculateThresholdLevels()
 	CV_Assert(m_distance_quantile_for_thresh <= m_distance_interval_levels);
 	std::vector<double> max_elements(levels_num);
 	for (int level = levels_num - 1; level >= 0; --level)
-	{
+	{		
+		//find max element in non-filtered array
+		const int max_el_ind = static_cast<int>(0.98 * m_distances_levels[level].size());
+		std::nth_element(m_distances_levels[level].begin(), m_distances_levels[level].begin() + 
+			max_el_ind, m_distances_levels[level].end());
+		const double max_el = m_distances_levels[level][max_el_ind];
+		max_elements[level] = max_el;
+
 		//delete too large distances
 		const auto first_elem_higher_than_thresh = std::partition(m_distances_levels[level].begin(), m_distances_levels[level].end(),
 			[&](const double dist)->bool
 		{
 			return dist < m_high_thresholds[level];
 		});
-		const int max_el_ind = static_cast<int>(0.98 * m_distances_levels[level].size());
-		std::nth_element(m_distances_levels[level].begin(), m_distances_levels[level].begin() + 
-			max_el_ind, m_distances_levels[level].end());
-		const double max_el = m_distances_levels[level][max_el_ind];
-		max_elements[level] = max_el;
 		m_distances_levels[level].erase(first_elem_higher_than_thresh, m_distances_levels[level].end());
 		std::vector<double> thresh_levels;
 		CalculateThresholdsLevels(m_distance_interval_levels, 0.02, m_distances_levels[level], thresh_levels);
@@ -345,16 +380,18 @@ void SetManager::CalculateThresholdLevels()
 		{
 			m_high_thresholds[level - 1] = m_dist_thresholds_levels[level][m_distance_quantile_for_thresh];
 		}
-		std::cout << max_el / (2.0 * m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
-			m_dist_thresholds_levels[level][m_distance_interval_levels - 2]) * m_distance_interval_levels << " ";
+		std::cout << (max_el - m_dist_thresholds_levels[level][0]) / (m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
+			m_dist_thresholds_levels[level][m_distance_interval_levels - 2]) + 1.0 << " ";
 	}
+	WriteInterval(m_mol_folder + m_mol_prefix + "_max_elements.txt", max_elements.begin(), max_elements.end());
+	WriteInterval(m_mol_folder + m_mol_prefix + "_high_thresholds.txt", m_high_thresholds.begin(), m_high_thresholds.end());
 	if (m_extend_distances)
 	{
 		int ext_el_num = 0;
 		for (int level = levels_num - 1; level >= 0; --level)
 		{
-			const int curr_ext_el_num = Round(max_elements[level] / (2.0 * m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - 
-				m_dist_thresholds_levels[level][m_distance_interval_levels - 2]) * m_distance_interval_levels);
+			const int curr_ext_el_num = Round((max_elements[level] - m_dist_thresholds_levels[level][0]) / 
+				(m_dist_thresholds_levels[level][m_distance_interval_levels - 1] - m_dist_thresholds_levels[level][m_distance_interval_levels - 2])) + 1;
 
 			ext_el_num = std::max(ext_el_num, curr_ext_el_num);
 		}
@@ -920,6 +957,9 @@ void SetManager::ReadParamsFromCommandLine(int argc, char** argv)
 	ReadParamFromCommandLineWithDefault(argc, argv, "-levels_overlap", m_pairs_levels_overlap, 1);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-write_pairs", m_write_pairs, true);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-extend_distances", m_extend_distances, false);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-add_for_thresh", m_add_for_thresh, 8.0);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-mult_for_dist_thresh", m_mult_for_dist_thresh, 1.35);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-use_linear_function", m_use_linear_function, false);
 	m_inited = true;
 }
 

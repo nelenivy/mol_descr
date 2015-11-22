@@ -1017,6 +1017,17 @@ void SngPtsFinderScaleSpace::FindSingPtsAsMaximumsOfScaleSpace()
 	}
 }
 
+std::vector<double> SngPtsFinderScaleSpace::GetSigmaValues()
+{
+	std::vector<double> sing_pts_sigmas(m_sing_pts_levels_num);
+	for (int i = 0; i < m_sing_pts_levels_num; ++i)
+	{
+		sing_pts_sigmas[i] = m_scale_space_blurrer.GetSigma(i + m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls);
+	}
+
+	return sing_pts_sigmas;
+}
+
 template <typename Iter>
 void CalcMeanAndDev(const Iter it_beg, const Iter it_end, double& mean, double& dev)
 {

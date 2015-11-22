@@ -37,7 +37,10 @@ threshold - порог для свойства, при значении ниже порога вещество считается не  
 
 	Нахождение ОТ и прогноз
 1. Изменить бат-файл run.bat
-%путь к exe-файлу% -mol_folder %set_folder% -mol_prefix %set_prefix% -distances_intervals 10 -distances_intervals_levels 10 -mesh_levels_num 10 -charges_threshes_num 2 -lennard_jones_threshes_num 2 -areas_threshes_num 0 -use_levels 1 -calculate_singular_points 1 -mgua_iterations_num 30 -mgua_descriptors_num 15
+
+E:\Disser\mol_descr\Disser\bin\x64_Release\Disser.exe -mol_folder E:\Disser\Tests\pirim205 -mol_prefix pirim  -calculate_descriptors 1 -distances_intervals 20 -distances_intervals_levels 15 -mesh_levels_num 18 -levels_overlap 2 -charges_threshes_num 3 -lennard_jones_threshes_num 3 areas_threshes_num 0 -write_pairs 1 -use_levels 1 -use_triples 0 -detect_blobs 1 -combine_channels 1 -calculate_singular_points 0 -init_curv_sigma 0.36 -sigma_max 9.08 -use_DOG_as_LOG_approximation 1 -one_ring_neighb 0 -use_euclid_distance 1 -use_calculated_scale_space 0 -use_calculated_detector_function 0 -use_calculated_eig_ratio 0 -cnannels_combining PCA -use_central_projector 0 -scale_extr 1 -ratio_thresh 50.0 -extend_distances 0 -use_linear_function 1 -add_for_thresh 8.0 -mult_for_dist_thresh 1.0
+
+%путь к exe-файлу% -mol_folder %set_folder% -mol_prefix %set_prefix% -distances_intervals 20 -distances_intervals_levels 15 -mesh_levels_num 18 -charges_threshes_num 3 -lennard_jones_threshes_num 3 -areas_threshes_num 0 -use_levels 1 -calculate_singular_points 1 -use_levels 1 -detect_blobs 1 -combine_channels 1  -init_curv_sigma 0.36 -sigma_max 9.08 -use_euclid_distance 1 -use_calculated_scale_space 0 -use_calculated_detector_function 0 -use_calculated_eig_ratio 0 -cnannels_combining PCA -scale_extr 1 -ratio_thresh 50.0 -extend_distances 0 -use_linear_function 1 -add_for_thresh 8.0 -mult_for_dist_thresh 1.0
 
 -distances_intervals - количество интервалов разбиения расстояния в парах ОТ для немасштабируемого алгоритма.
 -distances_intervals_levels - количество интервалов разбиения расстояния в парах ОТ для масштабируемого алгоритма.
@@ -45,8 +48,23 @@ threshold - порог для свойства, при значении ниже порога вещество считается не  
 -lennard_jones_threshes_num - количество интервалов разбиения значений потенциала леннарда-джонса
 -areas_threshes_num - количество интервалов разбиения значений площади сегмента для немногомасштабного алгоритма
 -use_levels - использовать ли многомасштабный алгоритм
--calculate_singular_points - вычислять ли ОТ или пользоваться ранее вычисленными 
--mgua_iterations_num 30 - количество итераций МГУА
--mgua_descriptors_num 15 - количество дескритпоров, отбираемых на каждой итерации
-2. Запустить run.bat. В результате должны появиться файлы со многими расширениями - это нахождение ОТ. Потом на экране часто замелькают цифры - это МГУА. 
-Лучшие дескрипторы на каждой итерации записываются в файл %set_folder%\%set_prefix%_descr_set.txt
+-calculate_singular_points - вычислять ли ОТ или пользоваться ранее вычисленными (можно использовать, если изменяют только параметры построения пар)
+-use_levels - использовать ли алгоритм из диссертации или из диплома (если 1 - то из диссертации)
+-detect_blobs - если 1, то детектировать структурные элементы (СЭ), если 0 - то детектировать ОТ (через размытие, алгоритм осени 2014 года)
+-combine_channels - если 1, то находить СЭ (или ОТ) по всем свойствам одновременно (кривизна, электростатический потенциял, потенциал Леннарда-джонса), если 0, то найти по каждому свойству СЭ по отдельности, а потом объединить найденные множества, удаляя дубликаты
+-init_curv_sigma - начальное значение радиуса размытия, подобрано опытным путем (0.36)
+-sigma_max - конечное значение размытия, подобрано опытным путем (9.08)
+-mesh_levels_num - кол-во интервалов, на которые делится интервал размытия
+-use_euclid_distance - если 1, использовать евклидово расстояние для размытия, если 0, то использовать геодезическое
+-use_calculated_scale_space - если 1, то использовать ранее посчитанное размытие функций (f в тексте работы). Использовать ранее посчитанное размытие можно, если не менять параметры -init_curv_sigma, -sigma_max, -mesh_levels_num, -use_euclid_distance
+-use_calculated_detector_function - если 1, то использовать посчитанную ранее функцию-детектор (f_detect в тексте работы). Можно использовать, если -use_calculated_scale_space установлен на 1
+-use_calculated_eig_ratio - если 1, то использовать ранее посчитанные отношения собственных значений второй квадратичной формы (используется для фильтрациии значений, соответствующих границам в функциях). Можно использовать, если -use_calculated_scale_space = 1, -use_calculated_eig_ratio = 1, и если -cnannels_combining не изменяется
+-cnannels_combining метод сведения нескольких свойств к скалярной функции. Варианты значений: PCA (используя PCA), NORM (вектор f заменяется на его норму), DETECTOR_NORM (вектор f_detect заменяется на его норму)
+-ratio_thresh - порог отношения собственных значений второй квадратичной формы, если больше порога, то вершина триангуляции считается принадлежащей ребру. Значение, подобранное опытным путем - 50.0 
+-extend_distances - если 1, то не используется ограничение расстояний в парах  
+-use_linear_function - если 1, то ограничение расстояний в парах вычисляется, как линейная функция радиуса размытия 
+-add_for_thresh - слагаемое в линейной функции (подобранное значение - 8.0)
+-mult_for_dist_thresh - множитель в линейной функции (подобранное значение - 1.0)
+т.е. функция, ограничивающая расстояние, выглядит, как -mult_for_dist_thresh* sigma + -add_for_thresh
+2. Запустить run.bat. В результате должны появиться файлы со многими расширениями - это нахождение ОТ. Потом на экране пойдут проценты - это обучение классификатора и показатели его качества. 
+отобранные дескрипторы, параметры запуска и показатели качества записываются в файл %set_folder%\%set_prefix%_descr_set1.txt

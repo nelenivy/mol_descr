@@ -89,7 +89,7 @@ public:
 	virtual void SetScaleSpace(const std::vector<std::vector<std::vector<double>>>& blurred_functions) { }
 	virtual void SetDetectorFunction(const std::vector<std::vector<std::vector<double>>>& detector_functions) { }
 	virtual void SetEigRatio(const std::vector<std::vector<double>>& eig_functions) { }
-
+	virtual std::vector<double> GetSigmaValues() { return std::vector<double>(); };
 	virtual ~ISingularPointsFinder() { }
 };
 

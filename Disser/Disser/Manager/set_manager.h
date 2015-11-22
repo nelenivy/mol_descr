@@ -33,6 +33,7 @@ private:
 	void FindOutMoleculesNum();
 	void CalculateDistThresholdsKMeans();
 	void CalculateThresholdLevels();
+	void CalcDistanceThresholdByLinearFunction();
 	std::string MakeMoleculePrefix(const int ind);
 private:
 	//params
@@ -51,6 +52,10 @@ private:
 	int m_pairs_levels_overlap;
 	bool m_write_pairs;
 	bool m_extend_distances;
+	bool m_use_linear_function;
+	double m_add_for_thresh;
+	double m_mult_for_dist_thresh;
+
 	MoleculeManager m_molecule_manager;
 	std::vector<double> m_distances;
 	std::vector<double> m_dist_thresholds;

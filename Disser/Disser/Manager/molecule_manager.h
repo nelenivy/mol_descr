@@ -71,6 +71,10 @@ public:
 	{
 		m_mean_and_sigma = mean_and_sigma;
 	}
+	std::vector<double> GetSigmaValues()
+	{
+		return m_sing_pts_finder->GetSigmaValues();
+	}
 	void CollectProperties(std::vector<std::vector<double>>& props);
 	void FindSingularPoints(const bool calculate, const bool calc_as_average);
 	void ReadAllSingularPoints(const int levels_num);
