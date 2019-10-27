@@ -319,6 +319,7 @@ public:
 		{
 			const auto curr_vert = vertex(curr_vert_num, vert_graph);
 			const int curr_thread = omp_get_thread_num();
+			CV_Assert(curr_thread < m_threads_num);
 			auto& seeds = seeds_all[curr_thread];
 			auto& prop_kernels = prop_kernels_all[curr_thread];
 			auto& mask = m_masks_all[curr_thread];

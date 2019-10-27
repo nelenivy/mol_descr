@@ -34,8 +34,10 @@ void SngPtsFinderSegmentation::CalcSingPtsFromCalculatedProperties(const std::ve
 	const int kMaxSegmSize = 500;
 	SegmentMolecularSurface(kMaxSegmSize, mesh_to_use);
 	FindSegmentsGraphAndCenters(mesh_to_use);
-	CalculateAllPotentials(charges, m_mesh_keeper.GetMesh()/*mesh_to_use*/, m_vertex_charge_map);
-	CalculateLennardJonesPotentials(wdv_radii, m_mesh_keeper.GetMesh()/*mesh_to_use*/, m_vertex_lennard_jones_map);
+	typedef ContPropMap<VerticesGraph, std::vector<cv::Point3d>, VERTEX> VetrticesDirMap;
+	VetrticesDirMap dummy_map;
+	CalculateAllPotentials(charges, m_mesh_keeper.GetMesh()/*mesh_to_use*/, m_vertex_charge_map, dummy_map);
+	CalculateLennardJonesPotentials(wdv_radii, m_mesh_keeper.GetMesh()/*mesh_to_use*/, m_vertex_lennard_jones_map, dummy_map);
 	CalculatePropsInSingPts(calc_prop_as_average);
 }
 

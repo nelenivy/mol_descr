@@ -180,8 +180,9 @@ void FindLocalMaximumsOnLevels(const Graph& graph, const std::vector<PropMap>& p
 				for (auto curr_neighb = vertices_within_dist.begin(), end_neighb = vertices_within_dist.end(); 
 					curr_neighb != end_neighb; ++curr_neighb)
 				{
-					if ((neighb_level == level && *curr_neighb == *curr_vertice) || 
-						(neighb_level != level && *curr_neighb != *curr_vertice))
+					if ((neighb_level == level && *curr_neighb == *curr_vertice) 
+						|| (neighb_level != level && *curr_neighb != *curr_vertice)
+						)
 					{
 						continue;
 					}

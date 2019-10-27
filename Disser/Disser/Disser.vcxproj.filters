@@ -131,6 +131,9 @@
     <ClInclude Include="GraphLib\interpolator.h">
       <Filter>GraphLib</Filter>
     </ClInclude>
+    <ClInclude Include="plot_scalar_curvature_calculation.h">
+      <Filter>GraphLib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

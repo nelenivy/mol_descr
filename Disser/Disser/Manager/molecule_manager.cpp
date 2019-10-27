@@ -62,7 +62,7 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 			}
 		}
 
-		if (!m_use_calculated_eig_ratio)
+		if (!m_use_calculated_eig_ratio && m_detector_type != HESS_DET)
 		{
 			for (int prop_type = ISingularPointsFinder::FIRST_PCA_PROP; prop_type <= ISingularPointsFinder::LAST_PCA_PROP; ++prop_type)
 			{
@@ -72,12 +72,12 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 			{
 				WriteSurfaceWithDblPropLevels(static_cast<ISingularPointsFinder::SurfProperty>(prop_type));
 			}
-			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);
-			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_GRAD);
+			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_SCALE_SPACE);			
 			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG);
 			WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_EIG_LOG);
 		}
 		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_LOG);
+		WriteSurfaceWithDblPropLevels(ISingularPointsFinder::PCA_GRAD);
 		WriteSurfaceWithDblProp(ISingularPointsFinder::UNCOIN_BASIS);
 	}
 	else
@@ -352,10 +352,12 @@ void MoleculeManager::CalculatePairsWithTypesLevelsAllMesh()
 	MeshKeeper mesh_keeper;
 	mesh_keeper.ConstructMesh(vertices, normals, triangles);
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
+	typedef ContPropMap<VerticesGraph, std::vector<cv::Point3d>, VERTEX> VetrticesDirMap;
 	VetrticesChargeMap vertex_charge_map;
-	CalculateAllPotentials(charges, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_charge_map);
+	VetrticesDirMap dummy_map;
+	CalculateAllPotentials(charges, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_charge_map, dummy_map);
 	VetrticesChargeMap vertex_lennard_jones_map;
-	CalculateLennardJonesPotentials(wdv_radii, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_lennard_jones_map);
+	CalculateLennardJonesPotentials(wdv_radii, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_lennard_jones_map, dummy_map);
 	std::vector<std::pair<cv::Point3d, size_t>> vertices_with_types;
 	ReadSurfaceWithTypes(vertices_with_types);
 	std::vector<pair_with_distance> pairs_vertices;
@@ -486,9 +488,11 @@ void MoleculeManager::CalculatePairsWithTypesLevelsAllMeshSmoothedCurv()
 	mesh_keeper.ConstructMesh(vertices, normals, triangles);
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	VetrticesChargeMap vertex_charge_map;
-	CalculateAllPotentials(charges, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_charge_map);
+	typedef ContPropMap<VerticesGraph, std::vector<cv::Point3d>, VERTEX> VetrticesDirMap;
+	VetrticesDirMap dummy_map;
+	CalculateAllPotentials(charges, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_charge_map, dummy_map);
 	VetrticesChargeMap vertex_lennard_jones_map;
-	CalculateLennardJonesPotentials(wdv_radii, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_lennard_jones_map);
+	CalculateLennardJonesPotentials(wdv_radii, mesh_keeper.GetMesh()/*mesh_to_use*/, vertex_lennard_jones_map, dummy_map);
 	std::vector<std::vector<std::pair<cv::Point3d, size_t>>> vertices_with_types_lev;
 	ReadSurfaceWithTypesLevels(vertices_with_types_lev);
 

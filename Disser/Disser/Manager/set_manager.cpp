@@ -112,6 +112,7 @@ void SetManager::ProcessSingularPoints(const bool calculate)
 			}
 		}
 		std::vector<std::vector<double>> prop_params(props.size());
+		//Filter outliers in properties
 		for (size_t ind = 0; ind < props.size(); ++ind)
 		{			
 			prop_params[ind].resize(2);

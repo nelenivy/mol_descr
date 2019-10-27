@@ -115,7 +115,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName);E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName)\3rdParty;E:\thirdparty\boost_1_53_0\bin_x64\lib\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_core240d.lib;zlibd.lib;</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core240d.lib;zlibd.lib;comctl32.lib;libjasperd.lib;libpngd.lib;libjpegd.lib;libtiffd.lib;opencv_core240d.lib;opencv_imgproc240d.lib;opencv_highgui240d.lib;opencv_core240d.lib;zlibd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -132,7 +132,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName);E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName)\3rdParty;E:\thirdparty\boost_1_53_0\bin\lib\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_core240.lib;zlib.lib;</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core240.lib;zlib.lib;comctl32.lib;libjasper.lib;libpng.lib;libjpeg.lib;libtiff.lib;opencv_core240.lib;opencv_imgproc240.lib;opencv_highgui240.lib;zlib.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -151,7 +151,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName);E:\thirdparty\OpenCV-2.4\vs2010_static_libs\lib\$(ConfigurationName)_$(PlatformName)\3rdParty;E:\thirdparty\boost_1_53_0\bin_x64\lib\</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_core240.lib;zlib.lib;</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core240.lib;zlib.lib;comctl32.lib;libjasper.lib;libpng.lib;libjpeg.lib;libtiff.lib;opencv_core240.lib;opencv_imgproc240.lib;opencv_highgui240.lib;zlib.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -190,6 +190,7 @@
     <ClInclude Include="Manager\set_manager.h" />
     <ClInclude Include="Manager\types_calculation.h" />
     <ClInclude Include="mesh_weighted_filter.h" />
+    <ClInclude Include="plot_scalar_curvature_calculation.h" />
     <ClInclude Include="scale_space_blur.h" />
     <ClInclude Include="SingularPoints\i_singular_points_finder.h" />
     <ClInclude Include="SingularPoints\pca_projections.h" />

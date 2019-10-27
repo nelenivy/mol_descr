@@ -348,7 +348,7 @@ template <class Graph, class CoordMap, class NormalMap, class BasisMap>
 void CalcTangentCoordSystemMap(const Graph& graph, const CoordMap& coord_map, const NormalMap& norm_map, 
 							   const double norm_thresh,BasisMap& basis_map)
 {
-	const int kItersNum = 600;
+	const int kItersNum = 1;
 	std::vector<ContPropMap<Graph, std::vector<cv::Mat_<double>>, VERTEX>> basises(
 		kItersNum, ContPropMap<Graph, std::vector<cv::Mat_<double>>, VERTEX>(graph));
 	const int step = (num_vertices(graph) - 1) / kItersNum;
@@ -545,4 +545,5 @@ void MarkUncoincidedBasises(const Graph& graph, const BasisMap& basis_map, MaskM
 		}*/
 	}
 }
+
 }

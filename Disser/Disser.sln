@@ -5,6 +5,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Disser", "Disser\Disser.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SVM", "SVM\SVM.vcxproj", "{597742E7-328E-4862-ABC5-C1285CC101AB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageTester", "ImageTester\ImageTester.vcxproj", "{06220C36-06A0-4C67-A543-8C9CFC038FC6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -39,11 +41,20 @@ Global
 		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|Win32.Build.0 = Release|Win32
 		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|x64.ActiveCfg = Release|x64
 		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|x64.Build.0 = Release|x64
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Win32.Build.0 = Debug|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|x64.ActiveCfg = Debug|x64
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|x64.Build.0 = Debug|x64
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Win32.ActiveCfg = Release|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Win32.Build.0 = Release|Win32
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|x64.ActiveCfg = Release|x64
+		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal

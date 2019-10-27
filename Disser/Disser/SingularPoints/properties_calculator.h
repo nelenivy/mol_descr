@@ -39,11 +39,12 @@ inline double CalculateLennardJonesPotential(const cv::Point3d& point, const std
 	return potential;
 }
 
-template <typename PropMap>
-void CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges, const Mesh& mesh, PropMap& vertex_charge_map)
+template <typename PropMap, typename PropMap3d>
+void CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& charges, const Mesh& mesh, PropMap& vertex_charge_map, PropMap3d& vertex_charge_dir_map)
 {
 	const VerticesGraph& vertices_graph = mesh.vertices;
 	vertex_charge_map.SetGraph(vertices_graph);
+	vertex_charge_dir_map.SetGraph(vertices_graph);
 	const double kProbeRadius = 1.53;
 	for (auto vertex_iter = vertices(vertices_graph).first, 
 		end_iter = vertices(vertices_graph).second; vertex_iter != end_iter; ++vertex_iter)
@@ -52,14 +53,20 @@ void CalculateAllPotentials(const std::vector<std::pair<cv::Point3d, double>>& c
 		const Point3d curr_norm = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Normal();
 		const cv::Point3d curr_force = CalculatePotential(curr_coord + curr_norm * kProbeRadius, charges);
 		vertex_charge_map[*vertex_iter] = curr_force.x * curr_norm.x + curr_force.y * curr_norm.y + curr_force.z * curr_norm.z;
+		vertex_charge_dir_map[*vertex_iter] = curr_force;
+		vertex_charge_dir_map[*vertex_iter].x /= cv::norm(curr_force);
+		vertex_charge_dir_map[*vertex_iter].y /= cv::norm(curr_force);
+		vertex_charge_dir_map[*vertex_iter].z /= cv::norm(curr_force);
 	}
 }
 
-template <typename PropMap>
-void CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const Mesh& mesh, PropMap& vertex_lennard_jones_map)
+template <typename PropMap, typename PropMap3d>
+void CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, double>>& wdv_radii, const Mesh& mesh, PropMap& vertex_lennard_jones_map, 
+	PropMap3d& vertex_lennard_jones_dir_map)
 {
 	const VerticesGraph& vertices_graph = mesh.vertices;
 	vertex_lennard_jones_map.SetGraph(vertices_graph);
+	vertex_lennard_jones_dir_map.SetGraph(vertices_graph);
 	const double kProbeRadius = 1.53;
 
 	for (auto vertex_iter = vertices(vertices_graph).first, 
@@ -69,6 +76,10 @@ void CalculateLennardJonesPotentials(const std::vector<std::pair<cv::Point3d, do
 		const Point3d curr_norm = get(boost::vertex_info_3d, vertices_graph, *vertex_iter).Normal();
 		const cv::Point3d curr_force = CalculateLennardJonesPotential(curr_coord + curr_norm * kProbeRadius, wdv_radii, kProbeRadius);
 		vertex_lennard_jones_map[*vertex_iter] = curr_force.x * curr_norm.x + curr_force.y * curr_norm.y + curr_force.z * curr_norm.z;
+		vertex_lennard_jones_dir_map[*vertex_iter] = curr_force;
+		vertex_lennard_jones_dir_map[*vertex_iter].x /= cv::norm(curr_force);
+		vertex_lennard_jones_dir_map[*vertex_iter].y /= cv::norm(curr_force);
+		vertex_lennard_jones_dir_map[*vertex_iter].z /= cv::norm(curr_force);
 	}
 }
 

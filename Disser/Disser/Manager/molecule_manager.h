@@ -11,6 +11,7 @@
 #include "InputOutput/params_reader.h"
 
 #include "SingularPoints/i_singular_points_finder.h"
+#include "SingularPoints/sng_pts_finder_scale_space.h"
 
 namespace molecule_descriptor
 {
@@ -26,6 +27,9 @@ public:
 		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_scale_space", m_use_calculated_scale_space, false);
 		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_detector_function", m_use_calculated_detector_function, false);
 		ReadParamFromCommandLineWithDefault(argc, argv, "-use_calculated_eig_ratio", m_use_calculated_eig_ratio, false);
+		std::string detector_type_name;
+		ReadParamFromCommandLineWithDefault(argc, argv, "-detector_type", detector_type_name, std::string("hess_det"));
+		m_detector_type = StringToDetectorFunctionType(detector_type_name);
 	}
 	void SetSingPtsAlgorithm(const SingularPointsAlgorithm alg)
 	{
@@ -213,6 +217,7 @@ private:
 	bool m_use_calculated_scale_space;
 	bool m_use_calculated_detector_function;
 	bool m_use_calculated_eig_ratio;
+	DetectorFunctionType m_detector_type;
 };
 
 }

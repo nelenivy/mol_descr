@@ -26,11 +26,32 @@ namespace molecule_descriptor
 using namespace std;
 using namespace cv;
 
+DetectorFunctionType StringToDetectorFunctionType(const std::string& enum_name)
+{
+	std::string lowercase_name = enum_name;
+	std::transform(lowercase_name.begin(), lowercase_name.end(), lowercase_name.begin(), std::tolower);
+	if (enum_name == std::string("log"))
+	{
+		return DetectorFunctionType::LOG;
+	}
+	else if (enum_name == std::string("dog"))
+	{
+		return DetectorFunctionType::DOG;
+	}
+	else if (enum_name == std::string("hess_det"))
+	{
+		return DetectorFunctionType::HESS_DET;
+	}
+	else
+	{
+		CV_Assert(0);
+	}
+}
+
 void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 {
 	ReadParamFromCommandLineWithDefault(argc, argv, "-mesh_levels_num", m_sing_pts_levels_num, 10);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-detect_blobs", m_detect_blobs, true);
-	ReadParamFromCommandLineWithDefault(argc, argv, "-use_DOG_as_LOG_approximation", m_use_DOG_as_LOG_approximation, true);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-use_euclid_distance", m_use_euclid_distance, false);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-combine_channels", m_combine_channels, true);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-one_ring_neighb", m_one_ring_neighb, true);
@@ -38,12 +59,18 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	ReadParamFromCommandLineWithDefault(argc, argv, "-init_curv_sigma", m_init_curv_sigma, 0.33);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-sigma_max", m_sigma_max, 2.89);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-use_central_projector", m_use_central_projector, false);
-	ReadParamFromCommandLineWithDefault(argc, argv, "-scale_extr", m_scale_extr, false);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-filter_by_eigenvalues", m_filter_by_eigenvalues, false);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-use_spherical", m_use_spherical, false);
+	std::string detector_type_name;
+	ReadParamFromCommandLineWithDefault(argc, argv, "-detector_type", detector_type_name, std::string("hess_det"));
+	m_detector_type = StringToDetectorFunctionType(detector_type_name);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-scale_extr", m_scale_extr, true);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-ratio_thresh", m_ratio_thresh, 8.0);
 	
 	std::string cnannels_combining_name;
 	ReadParamFromCommandLineWithDefault(argc, argv, "-cnannels_combining", cnannels_combining_name, std::string("PCA"));
-	m_channel_combination = PCA;
+	m_channel_combination = SCALAR_BLOB_RESPONSE;
+	
 	if (cnannels_combining_name == "PCA")
 	{
 		m_channel_combination = PCA;
@@ -56,16 +83,30 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	{
 		m_channel_combination = DETECTOR_NORM;
 	}
+	else if (cnannels_combining_name == "GENERALIZED_HESSIAN")
+	{
+		m_channel_combination = SCALAR_BLOB_RESPONSE;
+	}
+	else if (cnannels_combining_name == "MANIFOLD_DET_BLOB_RESPONSE")
+	{
+		m_channel_combination = MANIFOLD_DET_BLOB_RESPONSE;
+	}
+	
+
+	if (m_detector_type == HESS_DET)
+	{
+		CV_Assert(m_channel_combination == SCALAR_BLOB_RESPONSE || m_channel_combination == MANIFOLD_DET_BLOB_RESPONSE);
+	}
 
 	m_scale_space_levels_num = m_sing_pts_levels_num + (m_detect_blobs ? 3 : 2);
-	m_detector_function_levels_num = m_scale_space_levels_num - 1;
+	m_blob_response_levels_num = m_scale_space_levels_num - 1;
 	m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls = 1;
 
 	//INIT SCALE-SPACE
 	const bool kAdditive = false;
 	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
 	std::cout << "d_mult_sigma " << d_mult_sigma << std::endl;
-	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive);
+	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive, false, 1.0);
 }
 
 template <typename Graph, typename PropMap>
@@ -106,31 +147,31 @@ void SngPtsFinderScaleSpace::SetScaleSpace(const std::vector<std::vector<std::ve
 
 void SngPtsFinderScaleSpace::SetDetectorFunction(const std::vector<std::vector<std::vector<double>>>& detector_functions)
 {
-	CV_Assert(detector_functions.size() == m_detector_function_levels_num);
-	m_output_scale_space_diff.resize(m_detector_function_levels_num);
+	CV_Assert(detector_functions.size() == m_blob_response_levels_num);
+	m_components_blob_response.resize(m_blob_response_levels_num);
 
-	for (size_t curr_lev = 0; curr_lev < m_detector_function_levels_num; ++curr_lev)
+	for (size_t curr_lev = 0; curr_lev < m_blob_response_levels_num; ++curr_lev)
 	{
 		CV_Assert(detector_functions[curr_lev].size() == ISingularPointsFinder::SURF_PROPS_NUM);
-		m_output_scale_space_diff[curr_lev].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		m_components_blob_response[curr_lev].resize(ISingularPointsFinder::SURF_PROPS_NUM);
 
 		for (int curr_prop = 0; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 		{
 			const auto& input_cont = detector_functions[curr_lev][curr_prop];
-			auto& output_cont = m_output_scale_space_diff[curr_lev][curr_prop];
+			auto& output_cont = m_components_blob_response[curr_lev][curr_prop];
 			CopyVectorToMap(input_cont, Vertices(), output_cont);
 		}
 	}
 
-	m_scale_space_diff_calculated = true;
+	m_components_blob_response_calculated = true;
 }
 
 void SngPtsFinderScaleSpace::SetEigRatio(const std::vector<std::vector<double>>& eig_ratio_levels)
 {
-	CV_Assert(eig_ratio_levels.size() == m_detector_function_levels_num);
-	m_props_hessian_ratio_of_proj.resize(m_detector_function_levels_num);
+	CV_Assert(eig_ratio_levels.size() == m_blob_response_levels_num);
+	m_props_hessian_ratio_of_proj.resize(m_blob_response_levels_num);
 
-	for (size_t curr_lev = 0; curr_lev < m_detector_function_levels_num; ++curr_lev)
+	for (size_t curr_lev = 0; curr_lev < m_blob_response_levels_num; ++curr_lev)
 	{		
 		const auto& input_cont = eig_ratio_levels[curr_lev];
 		auto& output_cont = m_props_hessian_ratio_of_proj[curr_lev];
@@ -157,10 +198,10 @@ void SngPtsFinderScaleSpace::CalcOnlyProps(const std::vector<cv::Point3d>& verti
 	GetCoordinateMaps();
 	CalcTangentBasisFast();
 	CalcCurvature();
-	CalculateAllPotentials(charges, m_mesh_keeper.GetMesh(), m_vertex_charge_map);
-	CalculateLennardJonesPotentials(wdv_radii, m_mesh_keeper.GetMesh(), m_vertex_lennard_jones_map);
+	CalculateAllPotentials(charges, m_mesh_keeper.GetMesh(), m_vertex_charge_map, m_vertex_charge_dir_map);
+	CalculateLennardJonesPotentials(wdv_radii, m_mesh_keeper.GetMesh(), m_vertex_lennard_jones_map, m_vertex_lennard_jones_dir_map);
 	m_scale_space_calculated = false;
-	m_scale_space_diff_calculated = false;
+	m_components_blob_response_calculated = false;
 	m_hessian_ratio_calculated = false;
 }
 void SngPtsFinderScaleSpace::CalcSingPtsFromCalculatedProperties(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, 
@@ -169,7 +210,8 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCalculatedProperties(const std::vect
 	const bool calc_prop_as_average)
 {
 	CalculateDistanceMaps();
-	CalcTangentBasisConsistent();
+	//CalcTangentBasisConsistent();
+	CalcTangentBasisFast();
 	m_uncoincided_vertices.SetGraph(Vertices());
 	MarkUncoincidedBasises(Vertices(), m_tangent_basis_map, m_uncoincided_vertices);
 	CalcSingPtsFromCurvatureScales();
@@ -195,7 +237,7 @@ void SngPtsFinderScaleSpace::CalcTangentBasisFast()
 		Point_ToMat_Transposed(m_norm_map[*curr_vert], curr_normal);
 
 		coord_finder.Process(curr_normal, new_basis);
-		m_tangent_basis_map[*curr_vert] = new_basis.inv(DECOMP_SVD);
+		m_tangent_basis_map[*curr_vert] = new_basis.t();//inv(DECOMP_SVD);
 	}
 }
 
@@ -272,7 +314,7 @@ void SngPtsFinderScaleSpace::GetVerticesWithDblPropLevels(std::vector<std::vecto
 {
 	const size_t levels_num = 
 		(prop_type <= ISingularPointsFinder::SURF_PROPS_NUM) ?
-	m_scale_space_levels_num : m_detector_function_levels_num;
+	m_scale_space_levels_num : m_blob_response_levels_num;
 
 	vertices_with_props_lev.clear();
 	vertices_with_props_lev.resize(levels_num);
@@ -284,7 +326,7 @@ void SngPtsFinderScaleSpace::GetVerticesWithDblPropLevels(std::vector<std::vecto
 			m_output_scale_space[lev][prop_type] :
 
 		(prop_type >= ISingularPointsFinder::FIRST_LOG_PROP && prop_type <= ISingularPointsFinder::LAST_LOG_PROP ? 
-			m_output_scale_space_diff[lev]
+			m_components_blob_response[lev]
 		[prop_type - ISingularPointsFinder::SURF_PROPS_NUM - 1] : 
 
 		(prop_type >= ISingularPointsFinder::FIRST_PCA_PROP && prop_type <= ISingularPointsFinder::LAST_PCA_PROP ?
@@ -296,7 +338,7 @@ void SngPtsFinderScaleSpace::GetVerticesWithDblPropLevels(std::vector<std::vecto
 		[prop_type - ISingularPointsFinder::FIRST_EIG_PROP] : 
 
 		(prop_type == ISingularPointsFinder::PCA_LOG ? 
-			m_detector_function_projected[lev] :
+			m_blob_response[lev] :
 
 		(prop_type == ISingularPointsFinder::PCA_GRAD ?
 			m_projected_grad_norm[lev] :
@@ -378,34 +420,139 @@ void SngPtsFinderScaleSpace::CalcCurvature()
 	}
 }
 
-void SngPtsFinderScaleSpace::CalcScaleSpacePropsHessianRatio()
+void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 {
-	
-	m_props_hessian_ratio.resize(m_detector_function_levels_num);
-	m_grad_dx.resize(m_detector_function_levels_num);
-	m_grad_dy.resize(m_detector_function_levels_num);
+	m_props_hessian_ratio.resize(m_blob_response_levels_num);
+	m_grad_dx.resize(m_blob_response_levels_num);
+	m_grad_dy.resize(m_blob_response_levels_num);	
+	m_hessian_det.resize(m_blob_response_levels_num);
+	m_hessian.resize(m_blob_response_levels_num);
+	m_scalar_blob_response.resize(m_blob_response_levels_num);
+	m_props_hessian_ratio_of_proj.resize(m_blob_response_levels_num);
+	m_hessian_map_calculators.resize(m_blob_response_levels_num);
+	if (m_use_spherical)
+	{
+		m_spherical_hessian_map_calculators.resize(m_blob_response_levels_num);
+		m_hessian_spherical.resize(m_blob_response_levels_num);
+	}
 
-	m_projected_grad_x.resize(m_detector_function_levels_num);
-	m_projected_grad_y.resize(m_detector_function_levels_num);;
-	m_projected_grad_norm.resize(m_detector_function_levels_num);
-	m_props_hessian_ratio_of_proj.resize(m_detector_function_levels_num);
-	m_hessian_map_calculators.resize(m_detector_function_levels_num);
+	m_projected_grad_norm.resize(m_blob_response_levels_num);
+
 	//calculate gradients and hessians fro each level of each property
+	const int prev_threads_num = omp_get_num_threads();
 	omp_set_num_threads(8);
 #pragma omp parallel for
-	for (int curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 	{
+		for (size_t curr_prop = 0; curr_prop < m_output_scale_space[curr_level].size(); ++curr_prop)
+		{
+			for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+				curr_vertice != end_vertices; ++curr_vertice)
+			{
+				m_output_scale_space[curr_level][curr_prop][*curr_vertice] = 
+					m_output_scale_space[curr_level][curr_prop][*curr_vertice] * m_scale_space_blurrer.GetSigma(curr_level);
+			}	
+		}
+
 		m_props_hessian_ratio[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
 		m_grad_dx[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
 		m_grad_dy[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
-
+		m_hessian_det[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		m_hessian[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		if (m_use_spherical)
+		{
+			m_hessian_spherical[curr_level].resize(2 *(ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1));
+		}
 		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 		{
 			m_props_hessian_ratio[curr_level][curr_prop].SetGraph(Vertices());
+			m_hessian_det[curr_level][curr_prop].SetGraph(Vertices());
+			m_hessian[curr_level][curr_prop].SetGraph(Vertices());
+
 			m_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_scale_space[curr_level][curr_prop],
 				m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio[curr_level][curr_prop]);
 			m_grad_dx[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dx;
 			m_grad_dy[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dy;
+			m_hessian_det[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_hess_det;
+			m_hessian[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_hessian_map;
+		}	
+		//Calculate spherical hessians if we use them
+		if (m_use_spherical)
+		{
+			for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+			{
+				m_hessian_spherical[curr_level][2 * curr_prop].SetGraph(Vertices());
+				m_hessian_spherical[curr_level][2 * curr_prop + 1].SetGraph(Vertices());
+				m_spherical_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_spher_scale_space[curr_level][curr_prop],
+					m_vert_vert_dist, 1.0, m_tangent_basis_map);
+				for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+					curr_vertice != end_vertices; ++curr_vertice)
+				{
+					m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x[*curr_vertice] *= m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+					m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y[*curr_vertice] *= m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+				}
+				m_hessian_spherical[curr_level][2 * curr_prop] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x;
+				m_hessian_spherical[curr_level][2 * curr_prop + 1] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y;
+			}		
+		}
+		m_projected_grad_norm[curr_level].SetGraph(Vertices());
+		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			m_projected_grad_norm[curr_level][*curr_vertice] = 
+				sqrt(Sqr(m_grad_dx[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice])
+				+ Sqr(m_grad_dy[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice]));
+		}
+	}	
+
+	std::vector<DoubleVertGraphProp> filtered_det(ISingularPointsFinder::SURF_PROPS_NUM, DoubleVertGraphProp(Vertices()));
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+	{
+	//post-filter		
+		MedianKernelDist<double> med_kernel(0.5);
+		FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+			m_hessian_det[curr_level], true, 8,	med_kernel, filtered_det);
+		m_hessian_det[curr_level] = filtered_det;
+	}
+	
+	m_components_blob_response = m_hessian_det;
+	omp_set_num_threads(prev_threads_num);	
+}
+
+/*
+void SngPtsFinderScaleSpace::CalcScaleSpacePropsHessianRatio()
+{
+	
+	m_props_hessian_ratio.resize(m_blob_response_levels_num);
+	m_grad_dx.resize(m_blob_response_levels_num);
+	m_grad_dy.resize(m_blob_response_levels_num);
+
+	m_projected_grad_x.resize(m_blob_response_levels_num);
+	m_projected_grad_y.resize(m_blob_response_levels_num);;
+	m_projected_grad_norm.resize(m_blob_response_levels_num);
+	m_props_hessian_ratio_of_proj.resize(m_blob_response_levels_num);
+	m_hessian_map_calculators.resize(m_blob_response_levels_num);
+	m_hessian_det.resize(m_blob_response_levels_num);
+	//calculate gradients and hessians fro each level of each property
+	omp_set_num_threads(8);
+#pragma omp parallel for
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+	{
+		m_props_hessian_ratio[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		m_grad_dx[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		m_grad_dy[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+		m_hessian_det[curr_level].resize(ISingularPointsFinder::SURF_PROPS_NUM);
+
+		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+		{
+			m_props_hessian_ratio[curr_level][curr_prop].SetGraph(Vertices());
+			m_hessian_det[curr_level][curr_prop].SetGraph(Vertices());
+
+			m_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_scale_space[curr_level][curr_prop],
+				m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio[curr_level][curr_prop]);
+			m_grad_dx[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dx;
+			m_grad_dy[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dy;
+			m_hessian_det[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_hess_det;
 		}
 
 		m_projected_grad_x[curr_level].SetGraph(Vertices());
@@ -421,25 +568,35 @@ void SngPtsFinderScaleSpace::CalcScaleSpacePropsHessianRatio()
 			m_projected_grad_y[curr_level][*curr_vertice] = 
 				ProjectPCADiff(m_grad_dy[curr_level], m_coord_map, m_scale_space_projecter[curr_level], *curr_vertice);
 			m_projected_grad_norm[curr_level][*curr_vertice] = 
-				sqrt(Sqr(m_projected_grad_x[curr_level][*curr_vertice]) + Sqr(m_projected_grad_y[curr_level][*curr_vertice]));
+				sqrt(Sqr(m_grad_dx[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice])
+				+ Sqr(m_grad_dy[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice]));
+				//sqrt(Sqr(m_projected_grad_x[curr_level][*curr_vertice]) + Sqr(m_projected_grad_y[curr_level][*curr_vertice]));
 		}
 		//find hessian of projections
 		m_hessian_map_calculators[curr_level].ProcessFromGradient(Vertices(), m_coord_map, 
 			m_projected_grad_x[curr_level],m_projected_grad_y[curr_level],
 			m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio_of_proj[curr_level]);
 
-		m_projected_grad_norm[curr_level] = m_projected_grad_x[curr_level];		
+		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			m_projected_grad_norm[curr_level][*curr_vertice] = 0;
+			for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+			{
+				m_projected_grad_norm[curr_level][*curr_vertice] += m_hessian_det[curr_level][curr_prop][*curr_vertice];	
+			}
+		}
 	}
 }
-
+*/
 void SngPtsFinderScaleSpace::CalcHessianOfProjectedLog()
 {	//find hessian of LOG projections
-	m_props_hessian_ratio_of_proj_LOG.resize(m_detector_function_levels_num);
+	m_props_hessian_ratio_of_proj_LOG.resize(m_blob_response_levels_num);
 
-	for (size_t curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
+	for (size_t curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 	{
 		m_props_hessian_ratio_of_proj_LOG[curr_level].SetGraph(Vertices());
-		m_hessian_map_calculators[0].Process(Vertices(), m_coord_map, m_detector_function_projected[curr_level],
+		m_hessian_map_calculators[0].Process(Vertices(), m_coord_map, m_blob_response[curr_level],
 			m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio_of_proj_LOG[curr_level]);
 	}
 }
@@ -502,6 +659,76 @@ void SngPtsFinderScaleSpace::CalculateDistanceMaps()
 
 }
 
+void SngPtsFinderScaleSpace::CalcScalarBlobResponse()
+{
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+	{
+		m_scalar_blob_response[curr_level].SetGraph(Vertices());
+
+		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			m_scalar_blob_response[curr_level][*curr_vertice] = 0;
+
+			for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+			{
+				m_scalar_blob_response[curr_level][*curr_vertice] += m_hessian_det[curr_level][curr_prop][*curr_vertice];	
+			}
+
+			if (m_use_spherical)
+			{
+				for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+				{
+					for (int i = 0; i < 2; ++i)
+					{
+						const Mat_<double> curr_hess = m_hessian_spherical[curr_level][2 * curr_prop + i][*curr_vertice];
+						const double det = curr_hess(0,0) * curr_hess(1,1) - curr_hess(1,0) * curr_hess(0,1);
+						m_scalar_blob_response[curr_level][*curr_vertice] += det;	
+					}
+				}
+			}
+		}
+	}
+
+	m_blob_response = m_scalar_blob_response;
+}
+
+void SngPtsFinderScaleSpace::CalcManifoldDeterminantBlobResponse()
+{
+	m_manifold_det_blob_response.resize(m_blob_response_levels_num);
+
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+	{
+		m_manifold_det_blob_response[curr_level].SetGraph(Vertices());
+
+		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			
+			cv::Mat_<double> combined = cv::Mat_<double>::zeros(2, 2);
+
+			for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+			{
+				combined += m_hessian[curr_level][curr_prop][*curr_vertice] * m_hessian[curr_level][curr_prop][*curr_vertice];	
+			}
+
+			if (m_use_spherical)
+			{
+				for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+				{
+					for (int i = 0; i < 2; ++i)
+					{
+						combined += m_hessian_spherical[curr_level][2 * curr_prop + i][*curr_vertice] * m_hessian_spherical[curr_level][2 * curr_prop + i][*curr_vertice];
+					}
+				}
+			}
+
+			m_manifold_det_blob_response[curr_level][*curr_vertice] = sqrt(combined(0,0) * combined(1,1) - combined(1,0) * combined(0,1));
+		}
+	}
+
+	m_blob_response = m_manifold_det_blob_response;
+}
 void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 {
 	//DATA PREPARATION
@@ -510,7 +737,12 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 	m_input_prop_map[ISingularPointsFinder::MEAN_CURV] = m_mean_curvature;
 	m_input_prop_map[ISingularPointsFinder::ELECTR_POTENT] = m_vertex_charge_map;
 	m_input_prop_map[ISingularPointsFinder::STERIC_POTENT] = m_vertex_lennard_jones_map;
-	
+	if (m_use_spherical)
+	{
+		m_input_spherical_prop_map.resize(ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1);
+		m_input_spherical_prop_map[ISingularPointsFinder::ELECTR_FORCE_DIR - ISingularPointsFinder::FIRST_SPHER_PROP] = m_vertex_charge_dir_map;
+		m_input_spherical_prop_map[ISingularPointsFinder::STERIC_FORCE_DIR - ISingularPointsFinder::FIRST_SPHER_PROP] = m_vertex_lennard_jones_dir_map;
+	}
 	ResccaleInputFunctions();
 	//MAKE SCALE-SPACE
 	const bool use_post_filter = !m_detect_blobs;
@@ -520,6 +752,11 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 	{
 		m_scale_space_blurrer.MakeScaleSpace(Vertices(), m_vert_vert_dist, Triangles(), m_vert_tr_dist, m_input_prop_map, 
 			m_scale_space_levels_num, use_post_filter, m_output_scale_space);
+		if (m_use_spherical)
+		{
+			m_scale_space_blurrer.MakeScaleSpaceSpherical(Vertices(), m_vert_vert_dist, Triangles(), m_vert_tr_dist, m_input_spherical_prop_map, 
+				m_scale_space_levels_num, m_output_spher_scale_space);
+		}
 		m_scale_space_calculated = true;
 	}
 	//DETECT TYPES OF VERTICES FOR EACH LEVEL, ACCORDING TO THE CURVATURE	
@@ -538,79 +775,91 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 		}	
 	}	
 	//DETECT FEATURES
-	m_scale_space_projecter.resize(m_detector_function_levels_num);
+	m_scale_space_projecter.resize(m_blob_response_levels_num);
 
 	if (m_detect_blobs)
 	{		
 		std::cout << "LOG calculation" << std::endl;
 
-		if (!m_scale_space_diff_calculated)
+		if (!m_components_blob_response_calculated)
 		{
-			m_output_scale_space_diff.clear();
-			m_output_scale_space_diff.resize(m_detector_function_levels_num);
+			m_components_blob_response.clear();
+			m_components_blob_response.resize(m_blob_response_levels_num);
 
-			if (m_use_DOG_as_LOG_approximation)
+			if (m_detector_type == DOG)
 			{
 				CalculateDOG();
 			}
-			else
+			else if (m_detector_type == LOG)
 			{
 				CalculateLOG();
 			}
-			m_scale_space_diff_calculated = true;
+			else if (m_detector_type == HESS_DET)
+			{
+				CalcScaleSpaceHessian();
+				m_hessian_ratio_calculated = true;
+			}
+			else
+			{
+				CV_Assert(0);
+			}
+
+			m_components_blob_response_calculated = true;
 		}
 
-		//ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> scale_space_blurrer_shifted;//for calculation of derivative in t
-		//const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
-		//scale_space_blurrer_shifted.Init(m_init_curv_sigma, d_mult_sigma, 0.1, false);
-		//for (size_t curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
-		//{
-		//	const double coeff = (scale_space_blurrer_shifted.GetSigma(curr_level) + m_scale_space_blurrer.GetSigma(curr_level)) / 2.0; 
-		//	for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
-		//	{
-		//		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
-		//			curr_vertice != end_vertices; ++curr_vertice)
-		//		{
-		//			m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] *= sqrt(coeff);
-		//		}	
-		//	}
-		//}
 		//END LOG CALCULATION
 
-		//FIND VECTORS ON WHICH WE WILL PROJECT
-		std::cout << "find PCA" << std::endl;
-		m_scale_space_projecter.resize(m_detector_function_levels_num);
-		omp_set_num_threads(8);
-#pragma omp parallel for
-		for (int lev = 0; lev < m_detector_function_levels_num; ++lev)
+		if (m_channel_combination == PCA || m_channel_combination == NORM || m_channel_combination == DETECTOR_NORM)
 		{
-			m_scale_space_projecter[lev].SetGraph(Vertices());
+			//FIND VECTORS ON WHICH WE WILL PROJECT
+			std::cout << "find PCA" << std::endl;
+			m_scale_space_projecter.resize(m_blob_response_levels_num);
+			const int prev_threads = omp_get_num_threads();
+			omp_set_num_threads(8);
+	#pragma omp parallel for
+			for (int lev = 0; lev < m_blob_response_levels_num; ++lev)
+			{
+				m_scale_space_projecter[lev].SetGraph(Vertices());
 
-			if (m_channel_combination == PCA)
-			{
-				FindVectorsForProjection(Vertices(), m_coord_map, m_output_scale_space[lev], 
-					m_vert_vert_dist, 2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
+				if (m_channel_combination == PCA)
+				{
+					FindVectorsForProjection(Vertices(), m_coord_map, m_output_scale_space[lev], 
+						m_vert_vert_dist, 2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
+				}
+				else if (m_channel_combination == NORM)
+				{
+					SetPCAAsMeanOfFunction(Vertices(), m_output_scale_space[lev], m_vert_vert_dist, 
+						2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
+				}
+				else if (m_channel_combination == DETECTOR_NORM)
+				{
+					SetPCAAsMeanOfFunction(Vertices(), m_components_blob_response[lev], m_vert_vert_dist, 
+						2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
+				}
 			}
-			else if (m_channel_combination == NORM)
+
+			omp_set_num_threads(prev_threads);
+			CalculateProjectedVectors();
+
+			if (!m_hessian_ratio_calculated)
 			{
-				SetPCAAsMeanOfFunction(Vertices(), m_output_scale_space[lev], m_vert_vert_dist, 
-					2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
-			}
-			else if (m_channel_combination == DETECTOR_NORM)
-			{
-				SetPCAAsMeanOfFunction(Vertices(), m_output_scale_space_diff[lev], m_vert_vert_dist, 
-					2.0 * m_scale_space_blurrer.GetSigma(lev), m_scale_space_projecter[lev]);
+				std::cout << "hessian" << std::endl;
+				//CalcScaleSpacePropsHessianRatio();
+				CalcHessianOfProjectedLog();
+				m_hessian_ratio_calculated = true;
 			}
 		}
-
-		CalculateProjectedVectors();
-
-		if (!m_hessian_ratio_calculated)
+		else if (m_channel_combination == SCALAR_BLOB_RESPONSE)
 		{
-			std::cout << "hessian" << std::endl;
-			CalcScaleSpacePropsHessianRatio();
-			CalcHessianOfProjectedLog();
-			m_hessian_ratio_calculated = true;
+			CalcScalarBlobResponse();
+		}
+		else if (m_channel_combination == MANIFOLD_DET_BLOB_RESPONSE)
+		{
+			CalcManifoldDeterminantBlobResponse();
+		}
+		else
+		{
+			CV_Assert(0);
 		}
 		//////////////////////////////////////////////////////////////////////////
 		//DETECT POINTS
@@ -621,14 +870,15 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 			std::vector<DoubleVertGraphProp> input(1, DoubleVertGraphProp(Vertices()));
 			std::vector<DoubleVertGraphProp> filtered_detector(1, DoubleVertGraphProp(Vertices()));
 
-			for (size_t curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
+			for (size_t curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 			{
-				input[0] = m_detector_function_projected[curr_level];
+				input[0] = m_blob_response[curr_level];
 				/*MedianKernelWeightedDist*/MedianKernelDist<double> med_kernel(0.5);
 				//GaussianKernelWeightedDistTable<double> av_kernel(curr_sigma, m_exp_approx);
 				FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
 					input, true, 8,	med_kernel, filtered_detector);
-				const DoubleVertGraphProp& prop_map_to_process = m_detector_function_projected[curr_level];//filtered_detector[0];
+				//m_detector_function[curr_level] = filtered_detector[0];
+				const DoubleVertGraphProp& prop_map_to_process = m_blob_response[curr_level];//filtered_detector[0];
 				double mean = 0.0;
 				for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 					curr_vertice != end_vertices; ++curr_vertice)
@@ -643,10 +893,11 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 					dev += Sqr(mean - prop_map_to_process[*curr_vertice]);
 				}
 				dev /= num_vertices(Vertices());
+				std::cout << dev << " ";
 				for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 					curr_vertice != end_vertices; ++curr_vertice)
 				{
-					m_detector_function_projected[curr_level][*curr_vertice] = prop_map_to_process[*curr_vertice] / sqrt(dev);
+					m_blob_response[curr_level][*curr_vertice] = prop_map_to_process[*curr_vertice] / sqrt(dev);
 				}
 			}
 
@@ -699,14 +950,14 @@ void SngPtsFinderScaleSpace::ResccaleInputFunctions()
 
 void SngPtsFinderScaleSpace::CalculateLOG()
 {
-	for (size_t curr_level = 0; curr_level <m_detector_function_levels_num; ++curr_level)
+	for (size_t curr_level = 0; curr_level <m_blob_response_levels_num; ++curr_level)
 	{
 		const double coeff = m_scale_space_blurrer.GetSigma(curr_level);
-		m_output_scale_space_diff[curr_level].resize(m_output_scale_space[curr_level].size());
+		m_components_blob_response[curr_level].resize(m_output_scale_space[curr_level].size());
 
-		for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+		for (size_t curr_prop = 0; curr_prop < m_components_blob_response[curr_level].size(); ++curr_prop)
 		{
-			m_output_scale_space_diff[curr_level][curr_prop].SetGraph(Vertices());
+			m_components_blob_response[curr_level][curr_prop].SetGraph(Vertices());
 			/*SimpleLaplacian(vertices_graph, m_output_scale_space[curr_level][curr_prop], 
 				output_scale_space_diff[curr_level][curr_prop]);*/
 		}
@@ -715,17 +966,17 @@ void SngPtsFinderScaleSpace::CalculateLOG()
 		LoGKernelWeightedDist<double> kernel(m_scale_space_blurrer.GetSigma(curr_level));
 		FilterMeshWeightedFunc(Vertices(), Triangles(), 
 			m_vert_vert_dist, m_vert_tr_dist, m_input_prop_map, true,
-			kernel, m_output_scale_space_diff[curr_level]);
+			kernel, m_components_blob_response[curr_level]);
 		/*FilterMeshWeightedFunc(vertices_graph, triangles_graph, 
 		vert_vert_dist, vert_tr_dist, m_output_scale_space[curr_level], false,
 		kernel, output_scale_space_diff[curr_level]);*/
 					
-		for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+		for (size_t curr_prop = 0; curr_prop < m_components_blob_response[curr_level].size(); ++curr_prop)
 		{
 			for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 				curr_vertice != end_vertices; ++curr_vertice)
 			{
-				m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] = m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] * coeff;
+				m_components_blob_response[curr_level][curr_prop][*curr_vertice] = m_components_blob_response[curr_level][curr_prop][*curr_vertice] * coeff;
 			}	
 		}
 	}		
@@ -735,13 +986,13 @@ void SngPtsFinderScaleSpace::CalculateDOG()
 {
 	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> scale_space_blurrer_shifted;//for calculation of derivative in t
 	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
-	scale_space_blurrer_shifted.Init(m_init_curv_sigma, d_mult_sigma, 0.1, false);
+	scale_space_blurrer_shifted.Init(m_init_curv_sigma, d_mult_sigma, 0.1, false, false, 0.1);
 	std::vector<std::vector<DoubleVertGraphProp>> output_scale_space_shifted;
 	const bool use_post_filter = !m_detect_blobs;
 	scale_space_blurrer_shifted.MakeScaleSpace(Vertices(), m_vert_vert_dist, Triangles(), m_vert_tr_dist, m_input_prop_map, 
 		m_scale_space_levels_num, use_post_filter, output_scale_space_shifted);
 	//Calculate scales difference which approximates laplace operator
-	for (size_t curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
+	for (size_t curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 	{
 		const double coeff = (scale_space_blurrer_shifted.GetSigma(curr_level) + m_scale_space_blurrer.GetSigma(curr_level)) / 2.0 
 			/ (scale_space_blurrer_shifted.GetSigma(curr_level) - m_scale_space_blurrer.GetSigma(curr_level));
@@ -749,15 +1000,15 @@ void SngPtsFinderScaleSpace::CalculateDOG()
 		/*const double coeff = (m_scale_space_blurrer.GetSigma(curr_level + 1) + m_scale_space_blurrer.GetSigma(curr_level)) / 2.0 
 			/ (m_scale_space_blurrer.GetSigma(curr_level + 1) - m_scale_space_blurrer.GetSigma(curr_level));*/
 
-		m_output_scale_space_diff[curr_level].resize(m_output_scale_space[curr_level].size());
+		m_components_blob_response[curr_level].resize(m_output_scale_space[curr_level].size());
 		const auto& shifted_scale_space_lev = /*m_output_scale_space[curr_level + 1]*/output_scale_space_shifted[curr_level];
-		for (size_t curr_prop = 0; curr_prop < m_output_scale_space_diff[curr_level].size(); ++curr_prop)
+		for (size_t curr_prop = 0; curr_prop < m_components_blob_response[curr_level].size(); ++curr_prop)
 		{
-			m_output_scale_space_diff[curr_level][curr_prop].SetGraph(Vertices());
+			m_components_blob_response[curr_level][curr_prop].SetGraph(Vertices());
 			for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 				curr_vertice != end_vertices; ++curr_vertice)
 			{
-				m_output_scale_space_diff[curr_level][curr_prop][*curr_vertice] = coeff * 				 
+				m_components_blob_response[curr_level][curr_prop][*curr_vertice] = coeff * 				 
 					(shifted_scale_space_lev[curr_prop][*curr_vertice] - m_output_scale_space[curr_level][curr_prop][*curr_vertice]);
 
 			}	
@@ -767,16 +1018,16 @@ void SngPtsFinderScaleSpace::CalculateDOG()
 
 void SngPtsFinderScaleSpace::CalculateProjectedVectors()
 {
-	m_detector_function_projected.clear();
-	m_detector_function_projected.resize(m_detector_function_levels_num);
+	m_blob_response.clear();
+	m_blob_response.resize(m_blob_response_levels_num);
 	m_scale_space_projected.clear();
-	m_scale_space_projected.resize(m_detector_function_levels_num);
+	m_scale_space_projected.resize(m_blob_response_levels_num);
 	m_projecters_coords.clear();
-	m_projecters_coords.resize(m_detector_function_levels_num);
+	m_projecters_coords.resize(m_blob_response_levels_num);
 
-	for (int lev = 0; lev < m_detector_function_levels_num; ++lev)
+	for (int lev = 0; lev < m_blob_response_levels_num; ++lev)
 	{
-		m_detector_function_projected[lev].SetGraph(Vertices());
+		m_blob_response[lev].SetGraph(Vertices());
 		m_scale_space_projected[lev].SetGraph(Vertices());
 		const size_t kPcaPropsNum = ISingularPointsFinder::LAST_PCA_PROP - ISingularPointsFinder::FIRST_PCA_PROP + 1;
 		m_projecters_coords[lev].resize(kPcaPropsNum);
@@ -787,8 +1038,8 @@ void SngPtsFinderScaleSpace::CalculateProjectedVectors()
 		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 			curr_vertice != end_vertices; ++curr_vertice)
 		{
-			m_detector_function_projected[lev][*curr_vertice] = 
-				ProjectPCADiff(m_output_scale_space_diff[lev], m_coord_map, m_scale_space_projecter[lev], *curr_vertice);
+			m_blob_response[lev][*curr_vertice] = 
+				ProjectPCADiff(m_components_blob_response[lev], m_coord_map, m_scale_space_projecter[lev], *curr_vertice);
 			m_scale_space_projected[lev][*curr_vertice] = 
 				ProjectPCA(m_output_scale_space[lev], m_coord_map, m_scale_space_projecter[lev], *curr_vertice);
 
@@ -807,13 +1058,13 @@ void SngPtsFinderScaleSpace::FindSingPtsAsCombinedMaximumsOfLOG()
 	const double kMaxRadius = 1.0;
 	if (!m_use_central_projector)
 	{
-		FindLocalMaximumsOnLevels(Vertices(),m_detector_function_projected,  
-			 std::greater_equal<double>(), std::less_equal<double>(), m_vert_vert_dist,kMaxRadius, 
+		FindLocalMaximumsOnLevels(Vertices(),m_blob_response,  
+			 std::greater<double>(), std::less<double>(), m_vert_vert_dist,kMaxRadius, 
 			 m_scale_extr, m_maximums_with_levels);
 	}
 	else
 	{
-		FindLocalMaximumsOnLevelsVect(Vertices(),m_coord_map, m_output_scale_space_diff, m_scale_space_projecter,  
+		FindLocalMaximumsOnLevelsVect(Vertices(),m_coord_map, m_components_blob_response, m_scale_space_projecter,  
 			m_vert_vert_dist, kMaxRadius, std::greater_equal<double>(), std::less_equal<double>(), m_scale_extr, 
 			m_use_central_projector, m_maximums_with_levels);
 	}
@@ -823,7 +1074,10 @@ void SngPtsFinderScaleSpace::FindSingPtsAsCombinedMaximumsOfLOG()
 		std::cout << m_maximums_with_levels[curr_level].size() << " ";
 	}
 	std::cout << "\n";
-	FilterByEigenvaluesRatio();
+	if (m_filter_by_eigenvalues)
+	{
+		FilterByEigenvaluesRatio();
+	}
 	/*const auto maximums = m_maximums_with_levels;
 	FilterByEigenvaluesRatio();
 	m_maximums_with_levels = maximums;*/
@@ -847,7 +1101,7 @@ void SngPtsFinderScaleSpace::FilterByNormedLogValue()
 	for (size_t curr_level = 0; curr_level < m_maximums_with_levels.size(); ++curr_level)
 	{
 		//find detector function threshold
-		const auto& curr_detect_func_values = m_detector_function_projected[curr_level + m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls];
+		const auto& curr_detect_func_values = m_blob_response[curr_level + m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls];
 		//vect_for_thresh_search.clear();
 
 		//for (auto curr_val = curr_detect_func_values.begin(), end_val = curr_detect_func_values.end(); curr_val != end_val; ++curr_val)
@@ -951,13 +1205,13 @@ void SngPtsFinderScaleSpace::FindSingPtsAsSeparateMaximumsOfLOG()
 	std::vector<std::vector<DoubleVertGraphProp>> output_scale_space_diff_another_order(ISingularPointsFinder::SURF_PROPS_NUM);
 	for (int curr_prop = 0; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 	{
-		output_scale_space_diff_another_order[curr_prop].resize(m_detector_function_levels_num);
-		for (size_t curr_level = 0; curr_level < m_detector_function_levels_num; ++curr_level)
+		output_scale_space_diff_another_order[curr_prop].resize(m_blob_response_levels_num);
+		for (size_t curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 		{
-			output_scale_space_diff_another_order[curr_prop][curr_level] = m_output_scale_space_diff[curr_level][curr_prop];
+			output_scale_space_diff_another_order[curr_prop][curr_level] = m_components_blob_response[curr_level][curr_prop];
 		}
 	}
-	m_vertex_curv_type_mesh_levels.resize(m_detector_function_levels_num);
+	m_vertex_curv_type_mesh_levels.resize(m_blob_response_levels_num);
 	//find points
 	std::vector<std::vector<std::vector<VertexDescriptor>>> sing_points(ISingularPointsFinder::SURF_PROPS_NUM);//Prop -> level -> points set
 
