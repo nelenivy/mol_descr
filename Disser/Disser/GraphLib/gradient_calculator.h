@@ -17,7 +17,7 @@ template <class Graph, class CoordMap, class FunctionMap, class DistanceMap>
 void CalcDifferentialInVertLeastSquares(const Graph& graph, const CoordMap& coord_map, 
 						const FunctionMap& func_map, const DistanceMap& dist_map, const double dist_thresh, 
 						const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,
-						const cv::Mat_<double>& tangent_basis, const double min_grad, 
+						const cv::Mat_<double>& tangent_basis_inv, const double min_grad, 
 						const double max_grad, cv::Mat_<double>& grad)//vectors in columns, 3rd vector is normal to surface
 {
 	typedef typename boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
@@ -40,7 +40,7 @@ void CalcDifferentialInVertLeastSquares(const Graph& graph, const CoordMap& coor
 			continue;
 		}
 		Point_ToMat_Transposed(coord_map[*neighb_vert], neighb_coord);
-		vect_in_local_coords = tangent_basis * (neighb_coord - cent_coord);
+		vect_in_local_coords = tangent_basis_inv * (neighb_coord - cent_coord);
 		vect_in_local_coords(2) = 0.0; //vector should belong to tangent plane, so z coordinate should be 0
 		const double curve_length = cv::norm(neighb_coord - cent_coord);
 		vect_in_local_coords *= curve_length / cv::norm(vect_in_local_coords);
@@ -61,13 +61,13 @@ void CalcDifferentialInVertLeastSquares(const Graph& graph, const CoordMap& coor
 template <class Graph, class CoordMap, class FunctionMap, class DistanceMap,class TangentBasisMap, class GradientMap>
 void CalcDifferentialMaps(const Graph& graph, const CoordMap& coord_map, 
 					 const FunctionMap& func_map, const DistanceMap& dist_map, const double dist_thresh, 
-					 const TangentBasisMap& tangent_basis_map, const bool least_squares_grad, 
+					 const TangentBasisMap& tangent_basis_inv_map, const bool least_squares_grad, 
 					 GradientMap& grad_x, GradientMap& grad_y)
 {
 	for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
 	{
 		cv::Mat_<double> curr_grad;
-		CalcDifferentialInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert], -1000.0, 1000.0, curr_grad);
+		CalcDifferentialInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_inv_map[*curr_vert], -1000.0, 1000.0, curr_grad);
 		grad_x[*curr_vert] = curr_grad(0);
 		grad_y[*curr_vert] = curr_grad(1);
 	}
@@ -77,7 +77,7 @@ template <class Graph, class CoordMap, class FunctionMap, class DistanceMap>
 void CalcHessianByTaylorInVertLeastSquares(const Graph& graph, const CoordMap& coord_map, 
 											const FunctionMap& func_map, const DistanceMap& dist_map, const double dist_thresh, 
 											const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,
-											const cv::Mat_<double>& tangent_basis, //vectors in columns, 3rd vector is normal to surface
+											const cv::Mat_<double>& tangent_basis_inv, //vectors in columns, 3rd vector is normal to surface
 											const cv::Mat_<double>& differential, const double min_grad, 
 											const double max_grad, cv::Mat_<double>& hessian)
 {
@@ -102,7 +102,7 @@ void CalcHessianByTaylorInVertLeastSquares(const Graph& graph, const CoordMap& c
 			continue;
 		}
 		Point_ToMat_Transposed(coord_map[*neighb_vert], neighb_coord);
-		projected_vect = tangent_basis * (neighb_coord - cent_coord);
+		projected_vect = tangent_basis_inv * (neighb_coord - cent_coord);
 		projected_vect(2) = 0;
 		const double curve_length = cv::norm(neighb_coord - cent_coord);
 		projected_vect *= curve_length / cv::norm(projected_vect);
@@ -135,7 +135,7 @@ template <class Graph, class CoordMap, class FunctionMap, class DistanceMap>
 void CalcCovariantDifferentialInVertLeastSquares(const Graph& graph, const CoordMap& coord_map, 
 										const FunctionMap& func_vec_map, const DistanceMap& dist_map, const double dist_thresh, 
 										const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,
-										const cv::Mat_<double>& tangent_basis, const double min_grad, 
+										const cv::Mat_<double>& tangent_basis_inv, const double min_grad, 
 										const double max_grad, cv::Mat_<double>& grad_x, cv::Mat_<double>& grad_y)//vectors in columns, 3rd vector is normal to surface
 {
 	typedef typename boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
@@ -159,7 +159,7 @@ void CalcCovariantDifferentialInVertLeastSquares(const Graph& graph, const Coord
 			continue;
 		}
 		Point_ToMat_Transposed(coord_map[*neighb_vert], neighb_coord);
-		projected_vect = tangent_basis * (neighb_coord - cent_coord);
+		projected_vect = tangent_basis_inv * (neighb_coord - cent_coord);
 		projected_vect(2) = 0;
 		const double curve_length = cv::norm(neighb_coord - cent_coord);
 		projected_vect *= curve_length / cv::norm(projected_vect);
@@ -169,7 +169,7 @@ void CalcCovariantDifferentialInVertLeastSquares(const Graph& graph, const Coord
 		//const double curve_length = sqrt(Sqr(projected_vect(0)) + Sqr(projected_vect(1)));
 		const double curve_length = cv::norm(neighb_coord - cent_coord);
 		const cv::Mat_<double> vec_diff = func_vec_map[*neighb_vert] - func_vec_map[cent_vert];
-		const cv::Mat_<double> proj_vec_diff = tangent_basis * vec_diff;
+		const cv::Mat_<double> proj_vec_diff = tangent_basis_inv * vec_diff;
 		derivatives_x(curr_row, 0) = proj_vec_diff(0) / curve_length;
 		derivatives_y(curr_row, 0) = proj_vec_diff(1) / curve_length;
 	}
@@ -187,13 +187,13 @@ void CalcCovariantDifferentialInVertLeastSquares(const Graph& graph, const Coord
 template <class Graph, class CoordMap, class FunctionVecMap, class DistanceMap,class TangentBasisMap, class CovDiffMap>
 void CalcCovariantDifferentialMaps(const Graph& graph, const CoordMap& coord_map, 
 						  const FunctionVecMap& func_map, const DistanceMap& dist_map, const double dist_thresh, 
-						  const TangentBasisMap& tangent_basis_map, 
+						  const TangentBasisMap& tangent_basis_inv_map, 
 						  CovDiffMap& cov_diff)
 {
 	for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
 	{		
 		cv::Mat_<double> curr_grad_x, curr_grad_y;
-		CalcCovariantDifferentialInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert],
+		CalcCovariantDifferentialInVertLeastSquares(graph, coord_map, func_map, dist_map, dist_thresh, *curr_vert, tangent_basis_inv_map[*curr_vert],
 			-1000.0, 1000.0, curr_grad_x, curr_grad_y);
 		
 		cv::Mat_<double> curr_grad(2, 2);
@@ -218,70 +218,106 @@ public:
 	template <class Graph, class CoordMap, class DistanceMap,class TangentBasisMap>
 	void Process(const Graph& graph, const CoordMap& coord_map, 
 		const SphereMap& func_map, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map)
+		const TangentBasisMap& tangent_basis_inv_map, const int threads_num)
 	{
 		cv::Mat_<double> sphere_point;
-		m_spher_normal_coord_x.SetGraph(graph);
-		m_spher_normal_coord_y.SetGraph(graph);
+		m_spher_normal_coord_x.resize(threads_num);
+		m_spher_normal_coord_y.resize(threads_num);
+		for (int i = 0; i < threads_num; ++i)
+		{
+			m_spher_normal_coord_x[i].SetGraph(graph);
+			m_spher_normal_coord_y[i].SetGraph(graph);
+		}
 		m_hessian_map_x.SetGraph(graph);
 		m_hessian_map_y.SetGraph(graph);
-		for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
+		m_hessian_det_x.SetGraph(graph);
+		m_hessian_det_y.SetGraph(graph);
+		//m_coord_sphere_basis_map.SetGraph(graph);
+		const int prev_threads_num = omp_get_num_threads();
+		omp_set_num_threads(threads_num);
+		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor> vertices_ids(vertices(graph).first, vertices(graph).second);
+#pragma omp parallel for 
+		for (int i = 0; i < vertices_ids.size(); ++i)
 		{
-			ConvertToLocalNormalCoords(graph, func_map, dist_map, *curr_vert,dist_thresh);
+			const typename boost::graph_traits<Graph>::vertex_descriptor curr_vert = vertices_ids[i];
+			DoublePropMap& spher_normal_coord_x = m_spher_normal_coord_x[omp_get_thread_num()];
+			DoublePropMap& spher_normal_coord_y = m_spher_normal_coord_y[omp_get_thread_num()];
+			CV_Assert(spher_normal_coord_x.Size() == vertices_ids.size());
+			CV_Assert(spher_normal_coord_y.Size() == vertices_ids.size());
+			ConvertToLocalNormalCoords(graph, func_map, dist_map, curr_vert,dist_thresh, spher_normal_coord_x, spher_normal_coord_y);
 			cv::Mat_<double> curr_grad;
 			//Calculate Hessian for each coordinate (x, y) of local coordinates
-			CalcDifferentialInVertLeastSquares(graph, coord_map, m_spher_normal_coord_x, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert], 
+			CalcDifferentialInVertLeastSquares(graph, coord_map, spher_normal_coord_x, dist_map, dist_thresh, curr_vert, tangent_basis_inv_map[curr_vert], 
 				-1000.0, 1000.0, curr_grad);
-			CalcHessianByTaylorInVertLeastSquares(graph, coord_map, m_spher_normal_coord_x, dist_map, dist_thresh, 
-					*curr_vert,	tangent_basis_map[*curr_vert], //vectors in columns, 3rd vector is normal to surface
-					curr_grad, -1000.0, 1000.0, m_hessian_map_x[*curr_vert]);
+			CalcHessianByTaylorInVertLeastSquares(graph, coord_map, spher_normal_coord_x, dist_map, dist_thresh, 
+					curr_vert,	tangent_basis_inv_map[curr_vert], //vectors in columns, 3rd vector is normal to surface
+					curr_grad, -1000.0, 1000.0, m_hessian_map_x[curr_vert]);
 
-			CalcDifferentialInVertLeastSquares(graph, coord_map, m_spher_normal_coord_y, dist_map, dist_thresh, *curr_vert, tangent_basis_map[*curr_vert], 
+			CalcDifferentialInVertLeastSquares(graph, coord_map, spher_normal_coord_y, dist_map, dist_thresh, curr_vert, tangent_basis_inv_map[curr_vert], 
 				-1000.0, 1000.0, curr_grad);
-			CalcHessianByTaylorInVertLeastSquares(graph, coord_map, m_spher_normal_coord_y, dist_map, dist_thresh, 
-				*curr_vert,	tangent_basis_map[*curr_vert], //vectors in columns, 3rd vector is normal to surface
-				curr_grad, -1000.0, 1000.0, m_hessian_map_y[*curr_vert]);
+			CalcHessianByTaylorInVertLeastSquares(graph, coord_map, spher_normal_coord_y, dist_map, dist_thresh, 
+				curr_vert,	tangent_basis_inv_map[curr_vert], //vectors in columns, 3rd vector is normal to surface
+				curr_grad, -1000.0, 1000.0, m_hessian_map_y[curr_vert]);
+
+			m_hessian_det_x[curr_vert] = m_hessian_map_x[curr_vert](0,0) * m_hessian_map_x[curr_vert](1,1) - 
+				m_hessian_map_x[curr_vert](1,0) * m_hessian_map_x[curr_vert](0,1);
+			m_hessian_det_y[curr_vert] = m_hessian_map_y[curr_vert](0,0) * m_hessian_map_y[curr_vert](1,1) - 
+				m_hessian_map_y[curr_vert](1,0) * m_hessian_map_y[curr_vert](0,1);
 		}
+
+		omp_set_num_threads(prev_threads_num);
 	}
 
 	template <class Graph, class DistanceMap>
 	void ConvertToLocalNormalCoords(const Graph& graph, 
 		const SphereMap& func_map, const DistanceMap& dist_map, 
-		const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,const double dist_thresh)
+		const typename boost::graph_traits<Graph>::vertex_descriptor cent_vert,
+		const double dist_thresh, DoublePropMap& spher_normal_coord_x, DoublePropMap& spher_normal_coord_y)
 	{
 		//Find local coordinates
 		const cv::Point3d& curr_sphere_point = func_map[cent_vert];
-		const double theta = atan(curr_sphere_point.y / (curr_sphere_point.x + 0.0000000001));
+		const double theta = atan2(curr_sphere_point.y, curr_sphere_point.x);
 		const double phi = acos(curr_sphere_point.z);
 		const cv::Point3d r_vect = cv::Point3d(cos(theta) * sin(phi), sin(theta) * sin(phi), cos(phi));
 		const cv::Point3d theta_vect = cv::Point3d(-sin(theta), cos(theta), 0);
 		const cv::Point3d phi_vect = cv::Point3d(cos(theta) * cos(phi), sin(theta) * cos(phi), -sin(phi));
 		cv::Mat_<double> new_basis(3, 3), sphere_point;
-		Point_ToMat_Transposed(r_vect, new_basis.col(0));
-		Point_ToMat_Transposed(theta_vect, new_basis.col(1));
-		Point_ToMat_Transposed(r_vect, new_basis.col(2));
+		CopyPoint_ToCol(phi_vect, 0, new_basis);
+		CopyPoint_ToCol(theta_vect, 1, new_basis);
+		CopyPoint_ToCol(r_vect, 2, new_basis);
+		//if (cent_vert == 30)
+		{
+			//std::cout<<new_basis<<m_coord_sphere_basis_map[cent_vert];
+		}
+		CV_Assert(new_basis.type() ==m_coord_sphere_basis_map[cent_vert].type());
+		//m_coord_sphere_basis_map[cent_vert].create(3,3);
+		//new_basis.copyTo(m_coord_sphere_basis_map[cent_vert]);
 		//Fill x and  coords in neighbouring vertices
 		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor> vertices_within_dist;
 		GetVerticesWithinDistPlusAdjacent(cent_vert, graph, dist_map, dist_thresh, vertices_within_dist);
 		for (auto neighb_vert = vertices_within_dist.begin(), end_vert = vertices_within_dist.end(); neighb_vert != end_vert; ++neighb_vert)
 		{
+			CV_Assert(*neighb_vert < spher_normal_coord_x.Size());
 			if (*neighb_vert == cent_vert)
 			{
-				m_spher_normal_coord_x[*neighb_vert] = m_spher_normal_coord_y[*neighb_vert] = 0.0;
+				spher_normal_coord_x[*neighb_vert] = spher_normal_coord_y[*neighb_vert] = 0.0;
 				continue;
 			}
 			Point_ToMat_Transposed(func_map[*neighb_vert], sphere_point);
-			cv::Mat_<double> sphere_point_in_new_coords = new_basis * sphere_point;
+			cv::Mat_<double> sphere_point_in_new_coords = new_basis.inv() * sphere_point;
+			CV_Assert(sphere_point_in_new_coords.size().area() == 3);
 			const double new_phi = acos(sphere_point_in_new_coords(2));
-			const double new_theta = atan(sphere_point_in_new_coords(1) / (sphere_point_in_new_coords(0) + 0.0000000001));
-			m_spher_normal_coord_x[*neighb_vert] = new_phi * cos(new_theta);
-			m_spher_normal_coord_y[*neighb_vert] = new_phi * sin(new_theta);
+			const double new_theta = atan2(sphere_point_in_new_coords(1), sphere_point_in_new_coords(0));
+			spher_normal_coord_x[*neighb_vert] = new_phi * cos(new_theta);
+			spher_normal_coord_y[*neighb_vert] = new_phi * sin(new_theta);
 		}
 	}
 
 	HessianMap m_hessian_map_x, m_hessian_map_y;
-	DoublePropMap m_spher_normal_coord_x;
-	DoublePropMap m_spher_normal_coord_y;
+	DoublePropMap m_hessian_det_x, m_hessian_det_y;
+	CoordBasisMap m_coord_sphere_basis_map;
+	std::vector<DoublePropMap> m_spher_normal_coord_x;
+	std::vector<DoublePropMap> m_spher_normal_coord_y;
 };
 
 
@@ -295,19 +331,19 @@ public:
 	template <class Graph, class CoordMap, class FunctionMap, class DistanceMap,class TangentBasisMap, class RatioMap>
 	void Process(const Graph& graph, const CoordMap& coord_map, 
 		const FunctionMap& func_map, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map, const bool least_squares_grad,RatioMap& eigenvalues_ratio)
+		const TangentBasisMap& tangent_basis_inv_map, const bool least_squares_grad,RatioMap& eigenvalues_ratio)
 	{
 		m_dx.SetGraph(graph);
 		m_dy.SetGraph(graph);		
-		CalcDifferentialMaps(graph, coord_map, func_map,dist_map, dist_thresh, tangent_basis_map, least_squares_grad, m_dx, m_dy);
+		CalcDifferentialMaps(graph, coord_map, func_map,dist_map, dist_thresh, tangent_basis_inv_map, least_squares_grad, m_dx, m_dy);
 		
-		ProcessFromGradient(graph, coord_map, func_map,m_dx, m_dy, dist_map, dist_thresh,tangent_basis_map, least_squares_grad, eigenvalues_ratio);
+		ProcessFromGradient(graph, coord_map, func_map,m_dx, m_dy, dist_map, dist_thresh,tangent_basis_inv_map, least_squares_grad, eigenvalues_ratio);
 	}
 	
 	template <class Graph, class CoordMap, class FuncMap, class DistanceMap,class TangentBasisMap>
 	void CalcHessianTaylor(const Graph& graph, const CoordMap& coord_map, 
 		const FuncMap& func_map, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map)
+		const TangentBasisMap& tangent_basis_inv_map)
 	{		
 		m_grad_2d.SetGraph(graph);
 		for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
@@ -323,7 +359,7 @@ public:
 			CalcHessianByTaylorInVertLeastSquares(graph, coord_map, 
 				func_map, dist_map, dist_thresh, 
 				*curr_vert,
-				tangent_basis_map[*curr_vert], //vectors in columns, 3rd vector is normal to surface
+				tangent_basis_inv_map[*curr_vert], //vectors in columns, 3rd vector is normal to surface
 				m_grad_2d[*curr_vert], -1000.0, 1000.0, m_hessian_map[*curr_vert]);
 		}
 	}
@@ -331,7 +367,7 @@ public:
 	template <class Graph, class CoordMap, class GradMap, class DistanceMap,class TangentBasisMap>
 	void CalcHessianCovDiff(const Graph& graph, const CoordMap& coord_map, 
 		const GradMap& dx, const GradMap& dy, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map)
+		const TangentBasisMap& tangent_basis_inv_map)
 	{
 		cv::Mat_<double> grad_2d(3, 1);
 		m_grad_3d.SetGraph(graph);
@@ -340,18 +376,18 @@ public:
 			grad_2d(0, 0) = dx[*curr_vert];
 			grad_2d(1, 0) = dy[*curr_vert];
 			grad_2d(2, 0) = 0;
-			m_grad_3d[*curr_vert] = tangent_basis_map[*curr_vert].t() * grad_2d;			
+			m_grad_3d[*curr_vert] = tangent_basis_map[*curr_vert] * grad_2d;			
 		}
 		m_hessian_map.SetGraph(graph);
-		CalcCovariantDifferentialMaps(graph, coord_map, m_grad_3d,dist_map, dist_thresh, tangent_basis_map, m_hessian_map);	
+		CalcCovariantDifferentialMaps(graph, coord_map, m_grad_3d,dist_map, dist_thresh, tangent_basis_inv_map, m_hessian_map);	
 	}
 
 	template <class Graph, class CoordMap, class FuncMap, class GradMap, class DistanceMap,class TangentBasisMap, class RatioMap>
 	void ProcessFromGradient(const Graph& graph, const CoordMap& coord_map, const FuncMap& func_map,
 		const GradMap& dx, const GradMap& dy, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map, const bool least_squares_grad, RatioMap& eigenvalues_ratio)
+		const TangentBasisMap& tangent_basis_inv_map, const bool least_squares_grad, RatioMap& eigenvalues_ratio)
 	{
-		CalcHessianTaylor(graph, coord_map, func_map,dist_map, dist_thresh, tangent_basis_map);
+		CalcHessianTaylor(graph, coord_map, func_map,dist_map, dist_thresh, tangent_basis_inv_map);
 		//CalcHessianCovDiff(graph, coord_map, m_dx, m_dy, dist_map, dist_thresh,tangent_basis_map);
 
 		//find gradient threshold

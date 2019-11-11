@@ -662,7 +662,7 @@ void SetManager::ProcessSVMClassificationL0()
 	}
 
 	if (1)
-	{
+	{//Normalize columns 
 		for (int x = 0; x < m_md_matrix_double.cols; ++x)
 		{
 			double mean = 0;

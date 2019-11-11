@@ -42,6 +42,10 @@ DetectorFunctionType StringToDetectorFunctionType(const std::string& enum_name)
 	{
 		return DetectorFunctionType::HESS_DET;
 	}
+	else if (enum_name == std::string("hess_trace"))
+	{
+		return DetectorFunctionType::HESS_TRACE;
+	}
 	else
 	{
 		CV_Assert(0);
@@ -91,11 +95,21 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	{
 		m_channel_combination = MANIFOLD_DET_BLOB_RESPONSE;
 	}
+	else if (cnannels_combining_name == "MANIFOLD_TRACE_BLOB_RESPONSE")
+	{
+		m_channel_combination = MANIFOLD_TRACE_BLOB_RESPONSE;
+	}
 	
 
 	if (m_detector_type == HESS_DET)
 	{
+		std::cout<<m_channel_combination<<std::endl;
 		CV_Assert(m_channel_combination == SCALAR_BLOB_RESPONSE || m_channel_combination == MANIFOLD_DET_BLOB_RESPONSE);
+	}
+
+	if (m_detector_type == HESS_TRACE)
+	{
+		CV_Assert(m_channel_combination == MANIFOLD_TRACE_BLOB_RESPONSE);
 	}
 
 	m_scale_space_levels_num = m_sing_pts_levels_num + (m_detect_blobs ? 3 : 2);
@@ -106,7 +120,7 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	const bool kAdditive = false;
 	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
 	std::cout << "d_mult_sigma " << d_mult_sigma << std::endl;
-	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive, false, 1.0);
+	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive, false, 0.5);
 }
 
 template <typename Graph, typename PropMap>
@@ -213,23 +227,23 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCalculatedProperties(const std::vect
 	//CalcTangentBasisConsistent();
 	CalcTangentBasisFast();
 	m_uncoincided_vertices.SetGraph(Vertices());
-	MarkUncoincidedBasises(Vertices(), m_tangent_basis_map, m_uncoincided_vertices);
+	MarkUncoincidedBasises(Vertices(), m_tangent_basis_map_inv, m_uncoincided_vertices);
 	CalcSingPtsFromCurvatureScales();
 }
 
 void SngPtsFinderScaleSpace::CalcTangentBasisConsistent()
 {
 	//calculate tangent basis	
-	m_tangent_basis_map.SetGraph(Vertices());
+	m_tangent_basis_map_inv.SetGraph(Vertices());
 	//CalcTangentCoordSystemMap_SystemSolving(Vertices(), m_coord_map, m_norm_map, m_tangent_basis_map);
 
-	CalcTangentCoordSystemMap(Vertices(), m_coord_map, m_norm_map, 0.1, m_tangent_basis_map);
+	CalcTangentCoordSystemMap(Vertices(), m_coord_map, m_norm_map, 0.1, m_tangent_basis_map_inv);
 }
 
 void SngPtsFinderScaleSpace::CalcTangentBasisFast()
 {
 	//calculate tangent basis	
-	m_tangent_basis_map.SetGraph(Vertices());
+	m_tangent_basis_map_inv.SetGraph(Vertices());
 	VectorOrientedCoordFinder coord_finder;
 	for (auto curr_vert = boost::vertices(Vertices()).first, end_vert = boost::vertices(Vertices()).second; curr_vert != end_vert; ++curr_vert)
 	{
@@ -237,7 +251,7 @@ void SngPtsFinderScaleSpace::CalcTangentBasisFast()
 		Point_ToMat_Transposed(m_norm_map[*curr_vert], curr_normal);
 
 		coord_finder.Process(curr_normal, new_basis);
-		m_tangent_basis_map[*curr_vert] = new_basis.t();//inv(DECOMP_SVD);
+		m_tangent_basis_map_inv[*curr_vert] = new_basis.inv();
 	}
 }
 
@@ -327,7 +341,7 @@ void SngPtsFinderScaleSpace::GetVerticesWithDblPropLevels(std::vector<std::vecto
 
 		(prop_type >= ISingularPointsFinder::FIRST_LOG_PROP && prop_type <= ISingularPointsFinder::LAST_LOG_PROP ? 
 			m_components_blob_response[lev]
-		[prop_type - ISingularPointsFinder::SURF_PROPS_NUM - 1] : 
+		[prop_type - ISingularPointsFinder::FIRST_LOG_PROP] : 
 
 		(prop_type >= ISingularPointsFinder::FIRST_PCA_PROP && prop_type <= ISingularPointsFinder::LAST_PCA_PROP ?
 			m_projecters_coords[lev]
@@ -407,7 +421,7 @@ void SngPtsFinderScaleSpace::CalcCurvature()
 	{
 		Curvature curvatures;
 		curvature_calculator.CalculateCurvatureCubic(Vertices(), get(boost::vertex_info_3d, Vertices()), 
-			m_tangent_basis_map, *curr_vertice, curvatures);
+			m_tangent_basis_map_inv, *curr_vertice, curvatures);
 		m_gaussian_curvature[*curr_vertice] = curvatures.gaussian_curv;
 		m_mean_curvature[*curr_vertice] = curvatures.mean_curv;
 	}
@@ -434,6 +448,7 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 	{
 		m_spherical_hessian_map_calculators.resize(m_blob_response_levels_num);
 		m_hessian_spherical.resize(m_blob_response_levels_num);
+		m_hessian_spherical_det.resize(m_blob_response_levels_num);
 	}
 
 	m_projected_grad_norm.resize(m_blob_response_levels_num);
@@ -462,6 +477,7 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 		if (m_use_spherical)
 		{
 			m_hessian_spherical[curr_level].resize(2 *(ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1));
+			m_hessian_spherical_det[curr_level].resize(2 *(ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1));
 		}
 		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 		{
@@ -470,31 +486,14 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 			m_hessian[curr_level][curr_prop].SetGraph(Vertices());
 
 			m_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_scale_space[curr_level][curr_prop],
-				m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio[curr_level][curr_prop]);
+				m_vert_vert_dist, 0.5, m_tangent_basis_map_inv, true, m_props_hessian_ratio[curr_level][curr_prop]);
 			m_grad_dx[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dx;
 			m_grad_dy[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_dy;
 			m_hessian_det[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_hess_det;
 			m_hessian[curr_level][curr_prop] = m_hessian_map_calculators[curr_level].m_hessian_map;
 		}	
 		//Calculate spherical hessians if we use them
-		if (m_use_spherical)
-		{
-			for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
-			{
-				m_hessian_spherical[curr_level][2 * curr_prop].SetGraph(Vertices());
-				m_hessian_spherical[curr_level][2 * curr_prop + 1].SetGraph(Vertices());
-				m_spherical_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_spher_scale_space[curr_level][curr_prop],
-					m_vert_vert_dist, 1.0, m_tangent_basis_map);
-				for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
-					curr_vertice != end_vertices; ++curr_vertice)
-				{
-					m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x[*curr_vertice] *= m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
-					m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y[*curr_vertice] *= m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
-				}
-				m_hessian_spherical[curr_level][2 * curr_prop] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x;
-				m_hessian_spherical[curr_level][2 * curr_prop + 1] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y;
-			}		
-		}
+		
 		m_projected_grad_norm[curr_level].SetGraph(Vertices());
 		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 			curr_vertice != end_vertices; ++curr_vertice)
@@ -503,9 +502,44 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 				sqrt(Sqr(m_grad_dx[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice])
 				+ Sqr(m_grad_dy[curr_level][ISingularPointsFinder::GAUSS_CURV][*curr_vertice]));
 		}
-	}	
+	}
+
+	if (m_use_spherical)
+	{
+		for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+		{
+			std::cout << curr_level << std::endl;
+				for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+				{
+					std::cout << curr_prop << std::endl;
+					m_hessian_spherical[curr_level][2 * curr_prop].SetGraph(Vertices());
+					m_hessian_spherical[curr_level][2 * curr_prop + 1].SetGraph(Vertices());
+					m_hessian_spherical_det[curr_level][2 * curr_prop].SetGraph(Vertices());
+					m_hessian_spherical_det[curr_level][2 * curr_prop + 1].SetGraph(Vertices());
+					m_spherical_hessian_map_calculators[curr_level].Process(Vertices(), m_coord_map, m_output_spher_scale_space[curr_level][curr_prop],
+						m_vert_vert_dist, 0.5, m_tangent_basis_map_inv, 8);
+					
+					for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+						curr_vertice != end_vertices; ++curr_vertice)
+					{
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x[*curr_vertice] *= sqrt(0.01 * m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y[*curr_vertice] *= sqrt(0.01 * m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_x[*curr_vertice] *= 0.01 * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_y[*curr_vertice] *= 0.01 * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+					}
+					
+					m_hessian_spherical[curr_level][2 * curr_prop] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x;
+					m_hessian_spherical[curr_level][2 * curr_prop + 1] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y;
+
+					m_hessian_spherical_det[curr_level][2 * curr_prop] = m_spherical_hessian_map_calculators[curr_level].m_hessian_det_x;
+					m_hessian_spherical_det[curr_level][2 * curr_prop + 1] = m_spherical_hessian_map_calculators[curr_level].m_hessian_det_y;
+				}
+		}
+	}
 
 	std::vector<DoubleVertGraphProp> filtered_det(ISingularPointsFinder::SURF_PROPS_NUM, DoubleVertGraphProp(Vertices()));
+	std::vector<DoubleVertGraphProp> filtered_det_spherical(2 *(ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1),
+																DoubleVertGraphProp(Vertices()));
 	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 	{
 	//post-filter		
@@ -513,6 +547,13 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 		FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
 			m_hessian_det[curr_level], true, 8,	med_kernel, filtered_det);
 		m_hessian_det[curr_level] = filtered_det;
+
+		if (m_use_spherical)
+		{
+			FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+				m_hessian_spherical_det[curr_level], true, 8, med_kernel, filtered_det_spherical);
+			m_hessian_spherical_det[curr_level] = filtered_det_spherical;
+		}
 	}
 	
 	m_components_blob_response = m_hessian_det;
@@ -597,7 +638,7 @@ void SngPtsFinderScaleSpace::CalcHessianOfProjectedLog()
 	{
 		m_props_hessian_ratio_of_proj_LOG[curr_level].SetGraph(Vertices());
 		m_hessian_map_calculators[0].Process(Vertices(), m_coord_map, m_blob_response[curr_level],
-			m_vert_vert_dist, 1.0, m_tangent_basis_map, true, m_props_hessian_ratio_of_proj_LOG[curr_level]);
+			m_vert_vert_dist, 1.0, m_tangent_basis_map_inv, true, m_props_hessian_ratio_of_proj_LOG[curr_level]);
 	}
 }
 
@@ -681,9 +722,7 @@ void SngPtsFinderScaleSpace::CalcScalarBlobResponse()
 				{
 					for (int i = 0; i < 2; ++i)
 					{
-						const Mat_<double> curr_hess = m_hessian_spherical[curr_level][2 * curr_prop + i][*curr_vertice];
-						const double det = curr_hess(0,0) * curr_hess(1,1) - curr_hess(1,0) * curr_hess(0,1);
-						m_scalar_blob_response[curr_level][*curr_vertice] += det;	
+						m_scalar_blob_response[curr_level][*curr_vertice] += m_hessian_spherical_det[curr_level][2 * curr_prop + i][*curr_vertice];	
 					}
 				}
 			}
@@ -696,11 +735,32 @@ void SngPtsFinderScaleSpace::CalcScalarBlobResponse()
 void SngPtsFinderScaleSpace::CalcManifoldDeterminantBlobResponse()
 {
 	m_manifold_det_blob_response.resize(m_blob_response_levels_num);
-
+	std::vector<DoubleVertGraphProp> filtered_man_br(1, DoubleVertGraphProp(Vertices()));
+	std::vector<DoubleVertGraphProp> input_man_br(1, DoubleVertGraphProp(Vertices()));
+	std::cout << "CalcManifoldDeterminantBlobResponse ";
 	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
 	{
 		m_manifold_det_blob_response[curr_level].SetGraph(Vertices());
-
+		std::cout << curr_level << std::endl;
+		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+		{
+			std::nth_element(m_hessian_det[curr_level][curr_prop].begin(), m_hessian_det[curr_level][curr_prop].begin()
+			+ Round(0.2 * m_hessian_det[curr_level][curr_prop].Size()), m_hessian_det[curr_level][curr_prop].end());
+			std::cout << curr_prop << " " << *(m_hessian_det[curr_level][curr_prop].begin() + Round(0.2 * m_hessian_det[curr_level][curr_prop].Size())) << " " ;
+		}
+		if (m_use_spherical)
+		{
+			for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+			{
+				for (int i = 0; i < 2; ++i)
+				{
+					std::nth_element(m_hessian_spherical_det[curr_level][2*curr_prop+i].begin(), m_hessian_spherical_det[curr_level][2*curr_prop+i].begin()
+						+ Round(0.2 * m_hessian_spherical_det[curr_level][2*curr_prop+i].Size()), m_hessian_spherical_det[curr_level][2*curr_prop+i].end());
+					std::cout << "spher " << curr_prop << " " << *(m_hessian_spherical_det[curr_level][2*curr_prop+i].begin() + 
+						Round(0.2 * m_hessian_spherical_det[curr_level][2*curr_prop+i].Size())) << " " ;
+				}
+			}
+		}
 		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 			curr_vertice != end_vertices; ++curr_vertice)
 		{
@@ -709,7 +769,7 @@ void SngPtsFinderScaleSpace::CalcManifoldDeterminantBlobResponse()
 
 			for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
 			{
-				combined += m_hessian[curr_level][curr_prop][*curr_vertice] * m_hessian[curr_level][curr_prop][*curr_vertice];	
+				combined += m_hessian[curr_level][curr_prop][*curr_vertice] * m_hessian[curr_level][curr_prop][*curr_vertice];
 			}
 
 			if (m_use_spherical)
@@ -725,9 +785,91 @@ void SngPtsFinderScaleSpace::CalcManifoldDeterminantBlobResponse()
 
 			m_manifold_det_blob_response[curr_level][*curr_vertice] = sqrt(combined(0,0) * combined(1,1) - combined(1,0) * combined(0,1));
 		}
+
+		//post-filter		
+		MedianKernelDist<double> med_kernel(0.3);
+		input_man_br[0] = m_manifold_det_blob_response[curr_level];
+		FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+			input_man_br, true, 8,	med_kernel, filtered_man_br);
+		m_manifold_det_blob_response[curr_level] = filtered_man_br[0];
 	}
 
 	m_blob_response = m_manifold_det_blob_response;
+}
+
+void SngPtsFinderScaleSpace::CalcManifoldTraceBlobResponse()
+{
+	m_manifold_trace_blob_response.resize(m_blob_response_levels_num);
+	std::vector<DoubleVertGraphProp> filtered_tr_br(1, DoubleVertGraphProp(Vertices()));
+	std::vector<DoubleVertGraphProp> input_tr_br(1, DoubleVertGraphProp(Vertices()));
+
+	for (int curr_level = 0; curr_level < m_blob_response_levels_num; ++curr_level)
+	{
+		m_manifold_trace_blob_response[curr_level].SetGraph(Vertices());
+
+		for (int curr_prop = ISingularPointsFinder::FIRST_SURF_PROP; curr_prop < ISingularPointsFinder::SURF_PROPS_NUM; ++curr_prop)
+		{
+			for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+			{
+
+				cv::Mat_<double>& curr_hess = m_hessian[curr_level][curr_prop][*curr_vertice];
+				input_tr_br[0][*curr_vertice] = curr_hess(0,0) + curr_hess(1, 1);
+			}
+			//post-filter		
+			MedianKernelDist<double> med_kernel(0.5);
+			//FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+				//input_tr_br, true, 8,	med_kernel, filtered_tr_br);
+			for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+				curr_vertice != end_vertices; ++curr_vertice)
+			{
+				m_manifold_trace_blob_response[curr_level][*curr_vertice] += Sqr(input_tr_br[0][*curr_vertice]);
+			}
+		}
+		if (m_use_spherical)
+		{
+			for (int curr_prop = 0; curr_prop < ISingularPointsFinder::LAST_SPHER_PROP - ISingularPointsFinder::FIRST_SPHER_PROP + 1; ++curr_prop)
+			{
+				for (int i = 0; i < 2; ++i)
+				{
+					for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+						curr_vertice != end_vertices; ++curr_vertice)
+					{
+
+						cv::Mat_<double>& curr_hess = m_hessian_spherical[curr_level][2 * curr_prop + i][*curr_vertice];
+						input_tr_br[0][*curr_vertice] = curr_hess(0,0) + curr_hess(1, 1);
+					}
+					//post-filter		
+					MedianKernelDist<double> med_kernel(0.3);
+					//FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+						//input_tr_br, true, 8,	med_kernel, filtered_tr_br);
+					for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+						curr_vertice != end_vertices; ++curr_vertice)
+					{
+						m_manifold_trace_blob_response[curr_level][*curr_vertice] += Sqr(input_tr_br[0][*curr_vertice]);
+					}
+				}
+			}
+		}
+
+		for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
+			curr_vertice != end_vertices; ++curr_vertice)
+		{
+			m_manifold_trace_blob_response[curr_level][*curr_vertice] = sqrt(m_manifold_trace_blob_response[curr_level][*curr_vertice]);
+		}
+		
+		
+		//post-filter		
+		MedianKernelDist<double> med_kernel(0.3);
+		input_tr_br[0] = m_manifold_trace_blob_response[curr_level];
+		FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
+			input_tr_br, true, 8,	med_kernel, filtered_tr_br);
+
+		m_manifold_trace_blob_response[curr_level] = filtered_tr_br[0];
+		
+	}
+
+	m_blob_response = m_manifold_trace_blob_response;
 }
 void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 {
@@ -754,6 +896,9 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 			m_scale_space_levels_num, use_post_filter, m_output_scale_space);
 		if (m_use_spherical)
 		{
+			//m_scale_space_blurrer.MakeScaleSpaceSphericalHeatEq(Vertices(), m_vert_vert_dist, 
+				//m_coord_map, m_tangent_basis_map, m_input_spherical_prop_map, 
+				//m_scale_space_levels_num, 1.0, m_output_spher_scale_space);
 			m_scale_space_blurrer.MakeScaleSpaceSpherical(Vertices(), m_vert_vert_dist, Triangles(), m_vert_tr_dist, m_input_spherical_prop_map, 
 				m_scale_space_levels_num, m_output_spher_scale_space);
 		}
@@ -794,7 +939,7 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 			{
 				CalculateLOG();
 			}
-			else if (m_detector_type == HESS_DET)
+			else if (m_detector_type == HESS_DET || m_detector_type == HESS_TRACE)
 			{
 				CalcScaleSpaceHessian();
 				m_hessian_ratio_calculated = true;
@@ -856,6 +1001,10 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 		else if (m_channel_combination == MANIFOLD_DET_BLOB_RESPONSE)
 		{
 			CalcManifoldDeterminantBlobResponse();
+		}
+		else if (m_channel_combination == MANIFOLD_TRACE_BLOB_RESPONSE)
+		{
+			CalcManifoldTraceBlobResponse();
 		}
 		else
 		{
@@ -984,7 +1133,7 @@ void SngPtsFinderScaleSpace::CalculateLOG()
 
 void SngPtsFinderScaleSpace::CalculateDOG()
 {
-	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> scale_space_blurrer_shifted;//for calculation of derivative in t
+	ScaleSpaceBlurrer<VerticesGraph> scale_space_blurrer_shifted;//for calculation of derivative in t
 	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
 	scale_space_blurrer_shifted.Init(m_init_curv_sigma, d_mult_sigma, 0.1, false, false, 0.1);
 	std::vector<std::vector<DoubleVertGraphProp>> output_scale_space_shifted;

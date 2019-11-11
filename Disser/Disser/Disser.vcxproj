@@ -202,6 +202,7 @@
     <ClInclude Include="SingularPoints\segments_data.h" />
     <ClInclude Include="SingularPoints\singular_points_finder.h" />
     <ClInclude Include="SingularPoints\sng_pts_finder_scale_space.h" />
+    <ClInclude Include="SingularPoints\spherical_heat_equation.h" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

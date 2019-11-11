@@ -48,14 +48,14 @@ public:
 
 	CurvatureCalculator(const int max_neighbours_num);
 	template <typename CoordMapT, typename TangentBasisMap>
-	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	void CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 		const VertexDescr mesh_vertice, Curvature& curvature_matr);
 	template <typename CoordMapT, typename TangentBasisMap>
-	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	void CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 		const VertexDescr mesh_vertice, Curvature& curvature_matr);
 private:
 	template <class CurvatureType, typename CoordMapT, typename TangentBasisMap>
-	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+	void CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 		const VertexDescr mesh_vertices, Curvature& curvature_matr);
 	template <class Info3DType, class CurvatureType>
 	void FillEquationMatrices(const Info3DType& curr_vertex, const Info3DType& neighb_vertex, double* coeff_mat_row, double* z_vect);
@@ -109,24 +109,24 @@ CurvatureCalculator<NodeType>::CurvatureCalculator(const int max_neighbours_num)
 
 template <class GraphType>
 template <typename CoordMapT, typename TangentBasisMap>
-void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+void CurvatureCalculator<GraphType>::CalculateCurvatureCubic(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 	const VertexDescr mesh_vertex, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<CubicFittingCurvature>(graph, coord_map, tan_basis_map, mesh_vertex, curvature_matr);
+	CalculateCurvatureImpl<CubicFittingCurvature>(graph, coord_map, tan_basis_inv_map, mesh_vertex, curvature_matr);
 }
 
 //"A Comparison of Gaussian and Mean Curvatures Estimation Methods on Triangular Meshes"
 template <class GraphType>
 template <typename CoordMapT, typename TangentBasisMap>
-void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+void CurvatureCalculator<GraphType>::CalculateCurvatureParabolloid(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 	const VertexDescr mesh_vertex, Curvature& curvature_matr)
 {
-	CalculateCurvatureImpl<ParabolloidFittingCurvature>(graph, coord_map, tan_basis_map, mesh_vertex, curvature_matr);
+	CalculateCurvatureImpl<ParabolloidFittingCurvature>(graph, coord_map, tan_basis_inv_map, mesh_vertex, curvature_matr);
 }
 
 template <class GraphType>
 template <class CurvatureType, typename CoordMapT, typename TangentBasisMap>
-void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_map,
+void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& graph, const CoordMapT& coord_map, const TangentBasisMap& tan_basis_inv_map,
 	const VertexDescr mesh_vertex, Curvature& curvature_values)
 {
 	typedef boost::graph_traits<GraphType>::adjacency_iterator AdjacencyIter;
@@ -140,7 +140,7 @@ void CurvatureCalculator<GraphType>::CalculateCurvatureImpl(const GraphType& gra
 
 	ReservePlace<CurvatureType>(m_max_neighbours_num);
 	//find coordinate transformation
-	tan_basis_map[mesh_vertex].copyTo(m_rotat_mat);
+	m_rotat_mat = tan_basis_inv_map[mesh_vertex];
 	const size_t neighb_num = out_degree(mesh_vertex, graph);
 	ReservePlace<CurvatureType>(static_cast<int>(neighb_num));
 	typedef decltype(coord_map[mesh_vertex]) Info3DType;

@@ -62,7 +62,7 @@ void MoleculeManager::FindSingularPoints(const bool calculate, const bool calc_a
 			}
 		}
 
-		if (!m_use_calculated_eig_ratio && m_detector_type != HESS_DET)
+		if (!m_use_calculated_eig_ratio && !(m_detector_type == HESS_DET || m_detector_type == HESS_TRACE))
 		{
 			for (int prop_type = ISingularPointsFinder::FIRST_PCA_PROP; prop_type <= ISingularPointsFinder::LAST_PCA_PROP; ++prop_type)
 			{

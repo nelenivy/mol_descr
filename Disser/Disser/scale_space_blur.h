@@ -9,10 +9,12 @@
 #include "GraphLib\graph_filter.h"
 #include "mesh_weighted_filter.h"
 #include "GraphLib/graph_dist_calculate.h"
+#include "SingularPoints/spherical_heat_equation.h"
+
 namespace molecule_descriptor
 {
 
-template <class VerticesGraph, class CoordMapT, class ConvolutionKernel>
+template <class VerticesGraph>
 class ScaleSpaceBlurrer
 {
 public:
@@ -47,12 +49,6 @@ public:
 		{
 			return m_init_sigma * pow(m_sigma_diff, level) + m_offset;
 		}
-	}
-	template <class PropMapT>
-	double GetValInVertex(const VerticesGraph& graph, const PropMapT& prop_map, const CoordMapT& coord_map, const vertex_descriptor vert, const int level)
-	{
-		ConvolutionKernel av_kernel(GetSigma(level));
-		return m_av_finder.GetAverageInRad(graph,prop_map,coord_map,av_kernel,vert);
 	}
 
 	template <class TrianglesGraph, class PropMapT, class VertVertDistMap, class VertTrDistMap>
@@ -133,20 +129,23 @@ public:
 		std::vector<std::vector<Point3dVertGraphProp>>& filtered_prop_map_vect)
 	{
 		filtered_prop_map_vect.assign(levels_num, std::vector<Point3dVertGraphProp>(prop_map_vect.size(), Point3dVertGraphProp(vertices_graph)));
-		double true_sigma_for_recursive = 0.0;
+		double true_t_for_recursive = 0.0;
 
 		for (int curr_level = 0; curr_level < levels_num; ++curr_level)
 		{
 			const double curr_sigma = GetSigma(curr_level);
+			const double curr_t = Sqr(curr_sigma);
 			std::vector<Point3dVertGraphProp>& filtered_output = filtered_prop_map_vect[curr_level];
 
 			//for spherical data only recursive variant of smoothing because it gives true solution of heat equation
 			m_recursive_spherical_prop_map = curr_level > 0 ? filtered_prop_map_vect[curr_level - 1] : prop_map_vect;
-			GaussianKernelWeightedDist<cv::Point3d> av_kernel(m_recursive_sigma_delta);
+			
 			m_recursive_spherical_prop_map_res.assign(prop_map_vect.size(), Point3dVertGraphProp(vertices_graph));
-			for (;true_sigma_for_recursive < curr_sigma; true_sigma_for_recursive += m_recursive_sigma_delta)
+			for (;true_t_for_recursive < curr_t; )
 			{
-				std::cout << true_sigma_for_recursive << "\n";
+				const double curr_sigma_delta = std::min(sqrt(curr_t - true_t_for_recursive), m_recursive_sigma_delta);
+				GaussianKernelWeightedDist<cv::Point3d> av_kernel(curr_sigma_delta);
+				//std::cout << true_sigma_for_recursive << "\n";
 				FilterMeshWeightedFuncMultiThread(vertices_graph, tr_graph, vert_vert_dist, vert_tr_dist, m_recursive_spherical_prop_map, true, 8,
 					av_kernel, m_recursive_spherical_prop_map_res);
 				//reproject 3d data on sphere
@@ -161,8 +160,45 @@ public:
 					}
 				}
 				m_recursive_spherical_prop_map = m_recursive_spherical_prop_map_res;
+				true_t_for_recursive += Sqr(curr_sigma_delta);
 			}
-			true_sigma_for_recursive -= m_recursive_sigma_delta;
+			filtered_prop_map_vect[curr_level] = m_recursive_spherical_prop_map_res;
+		}			
+	}
+
+	template <class VertVertDistMap, class CoordMap, class TangentBasisMap>
+	void MakeScaleSpaceSphericalHeatEq(const VerticesGraph& vertices_graph, const VertVertDistMap& vert_vert_dist, 
+		const CoordMap& coord_map,
+		const TangentBasisMap& tangent_basis_map, 
+		const std::vector<Point3dVertGraphProp>& prop_map_vect, 
+		const int levels_num, const double recursive_t_delta,
+		std::vector<std::vector<Point3dVertGraphProp>>& filtered_prop_map_vect)
+	{
+		filtered_prop_map_vect.assign(levels_num, std::vector<Point3dVertGraphProp>(prop_map_vect.size(), Point3dVertGraphProp(vertices_graph)));
+		double true_t_for_eq = 0.0;
+
+		for (int curr_level = 0; curr_level < levels_num; ++curr_level)
+		{
+			const double needed_t = Sqr(GetSigma(curr_level));
+			std::vector<Point3dVertGraphProp>& filtered_output = filtered_prop_map_vect[curr_level];
+
+			//for spherical data only recursive variant of smoothing because it gives true solution of heat equation
+			m_recursive_spherical_prop_map = curr_level > 0 ? filtered_prop_map_vect[curr_level - 1] : prop_map_vect;
+
+			m_recursive_spherical_prop_map_res.assign(prop_map_vect.size(), Point3dVertGraphProp(vertices_graph));
+			for (;true_t_for_eq < needed_t; )
+			{
+				std::cout << true_t_for_eq << " ";
+				const double curr_t_delta = std::min(needed_t - true_t_for_eq, recursive_t_delta);
+
+				for (int curr_prop = 0; curr_prop < m_recursive_spherical_prop_map.size(); ++curr_prop)
+				{
+					SphericalHeatEquation().ProcessIteration(vertices_graph, coord_map, m_recursive_spherical_prop_map[curr_prop], vert_vert_dist, 1.0, 
+						tangent_basis_map, curr_t_delta, m_recursive_spherical_prop_map_res[curr_prop]);
+				}
+				m_recursive_spherical_prop_map = m_recursive_spherical_prop_map_res;
+				true_t_for_eq += curr_t_delta;
+			}
 			filtered_prop_map_vect[curr_level] = m_recursive_spherical_prop_map_res;
 		}			
 	}
@@ -195,7 +231,6 @@ private:
 	bool m_additive;//true - additive, false - multiplicative
 	bool m_recursive;//true - additive, false - multiplicative
 	double m_recursive_sigma_delta;
-	AverageFinder<VerticesGraph, CoordMapT> m_av_finder;
 	std::vector<std::vector<DoubleVertGraphProp>> m_filtered_before_postproc;
 	std::vector<DoubleVertGraphProp> m_recursive_prop_map;
 	std::vector<DoubleVertGraphProp> m_recursive_prop_map_res;

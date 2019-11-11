@@ -327,7 +327,7 @@ public:
 			auto& segmentator = m_segmentator_all[curr_thread];
 
 			seeds.clear();
-			//mark triangles which are within distance
+			//mark triangles which are within distance or adjacent
 			for (auto curr_tr = vertices(tr_graph).first, end_tr = vertices(tr_graph).second;
 				curr_tr != end_tr; ++curr_tr)
 			{

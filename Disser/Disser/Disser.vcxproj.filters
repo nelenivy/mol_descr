@@ -134,6 +134,9 @@
     <ClInclude Include="plot_scalar_curvature_calculation.h">
       <Filter>GraphLib</Filter>
     </ClInclude>
+    <ClInclude Include="SingularPoints\spherical_heat_equation.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

@@ -19,7 +19,7 @@ namespace molecule_descriptor
 
 enum DetectorFunctionType
 {
-	LOG, DOG, HESS_DET
+	LOG, DOG, HESS_DET, HESS_TRACE
 };
 
 DetectorFunctionType StringToDetectorFunctionType(const std::string& enum_name);
@@ -104,6 +104,7 @@ private:
 	void CalcScaleSpaceHessian();
 	void CalcScalarBlobResponse();
 	void CalcManifoldDeterminantBlobResponse();
+	void CalcManifoldTraceBlobResponse();
 	void ResccaleInputFunctions();
 	void CalculateDOG();
 	void CalculateLOG();
@@ -159,7 +160,7 @@ private:
 	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<Vertice>> CoordMap;
 	typedef ProxyPropMapVal<boost::property_map<const VerticesGraph, boost::vertex_info_3d_t>::const_type, GetNormal<Vertice>> NormalMap;
 	typedef ProxyPropMapVal<boost::property_map<const TrianglesGraph, boost::vertex_info_3d_t>::const_type, GetCoord<MeshTriangle>> CoordMapTriangle;
-	ScaleSpaceBlurrer<VerticesGraph, CoordMap, GaussianKernel<cv::Point3d, double>> m_scale_space_blurrer;
+	ScaleSpaceBlurrer<VerticesGraph> m_scale_space_blurrer;
 	std::vector<std::vector<DoubleVertGraphProp>> m_components_blob_response;
 	bool m_components_blob_response_calculated;
 	std::vector<std::vector<DoubleVertGraphProp>> m_output_scale_space;
@@ -186,7 +187,7 @@ private:
 	std::vector<std::vector<DoubleVertGraphProp>> m_projecters_coords;
 
 	typedef ContPropMap<VerticesGraph, std::vector<cv::Mat_<double>>, VERTEX> TangentBasisMap;
-	TangentBasisMap m_tangent_basis_map;
+	TangentBasisMap m_tangent_basis_map_inv;
 
 	std::vector<HessianMatrixCalculator> m_hessian_map_calculators;
 	std::vector<HessianMatrixCalculatorSpherical> m_spherical_hessian_map_calculators;
@@ -199,7 +200,9 @@ private:
 	std::vector<DoubleVertGraphProp> m_props_hessian_ratio_of_proj;
 	std::vector<DoubleVertGraphProp> m_scalar_blob_response;
 	std::vector<DoubleVertGraphProp> m_manifold_det_blob_response;
+	std::vector<DoubleVertGraphProp> m_manifold_trace_blob_response;
 	std::vector<std::vector<DoubleVertGraphProp>> m_hessian_det;
+	std::vector<std::vector<DoubleVertGraphProp>> m_hessian_spherical_det;
 	std::vector<std::vector<MatrixVertGraphProp>> m_hessian;
 	std::vector<std::vector<MatrixVertGraphProp>> m_hessian_spherical;
 	double m_ratio_thresh;
@@ -217,7 +220,7 @@ private:
 
 	enum ChannelsCombination
 	{
-		PCA, NORM, DETECTOR_NORM, SCALAR_BLOB_RESPONSE, MANIFOLD_DET_BLOB_RESPONSE
+		PCA, NORM, DETECTOR_NORM, SCALAR_BLOB_RESPONSE, MANIFOLD_DET_BLOB_RESPONSE, MANIFOLD_TRACE_BLOB_RESPONSE
 	};
 
 	ChannelsCombination m_channel_combination;

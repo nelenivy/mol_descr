@@ -55,6 +55,16 @@ void Point_ToMat_Transposed(const cv::Point3_<T>& point, cv::Mat_<T>& mat)
 }
 
 template<typename T>
+void CopyPoint_ToCol(const cv::Point3_<T>& point, const int col_num, cv::Mat_<T>& mat)
+{
+	T point_arr[] = {point.x, point.y, point.z};
+	for (int i = 0; i < 3; ++i)
+	{
+		mat(i, col_num) = point_arr[i];
+	}
+}
+
+template<typename T>
 void Point_ToMat_Transposed(const cv::Point_<T>& point, cv::Mat_<T>& mat)
 {
 	T point_arr[] = {point.x, point.y, point.z};
