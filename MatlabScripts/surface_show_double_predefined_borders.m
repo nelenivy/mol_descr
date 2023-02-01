@@ -2,7 +2,7 @@ function  surface_show_double_predefined_borders(triangles_file, prop_file, cent
 
 [vertice_matrix, face_matrix, prop_matrix] = read_surface(triangles_file, prop_file, double_prop);
 
-%calculate deviation
+%calculate mean and deviation of prop_matrix
 max_segment = 0;
 min_segment = 100000;
 mean = 0.0;

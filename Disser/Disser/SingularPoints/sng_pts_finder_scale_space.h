@@ -116,6 +116,8 @@ private:
 	void FilterByEigenvaluesRatio();
 	void FilterByNormedLogValue();
 
+	void VisualizeSphereMaps();
+	void VisualizeSphereMapsWithSngPts();
 	typedef ContPropMap<VerticesGraph, std::vector<double>, VERTEX> VetrticesChargeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<size_t>, VERTEX> VetrticesTypeMap;
 	typedef ContPropMap<VerticesGraph, std::vector<uint8_t>, VERTEX> VetrticesCurvMap;
@@ -153,7 +155,7 @@ private:
 	bool m_use_euclid_distance;
 	bool m_one_ring_neighb;
 	bool m_combine_channels;
-
+	bool m_visualize;
 	double m_init_curv_sigma;
 	double m_sigma_max;
 

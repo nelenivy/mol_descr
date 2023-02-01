@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29519.181
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Disser", "Disser\Disser.vcxproj", "{982396FE-2533-42A2-AF6B-1B79FDF5583A}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SVM", "SVM\SVM.vcxproj", "{597742E7-328E-4862-ABC5-C1285CC101AB}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageTester", "ImageTester\ImageTester.vcxproj", "{06220C36-06A0-4C67-A543-8C9CFC038FC6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,32 +27,11 @@ Global
 		{982396FE-2533-42A2-AF6B-1B79FDF5583A}.Release|Win32.Build.0 = Release|Win32
 		{982396FE-2533-42A2-AF6B-1B79FDF5583A}.Release|x64.ActiveCfg = Release|x64
 		{982396FE-2533-42A2-AF6B-1B79FDF5583A}.Release|x64.Build.0 = Release|x64
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|Mixed Platforms.Build.0 = Debug|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|Win32.ActiveCfg = Debug|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|Win32.Build.0 = Debug|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|x64.ActiveCfg = Debug|x64
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Debug|x64.Build.0 = Debug|x64
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|Win32.ActiveCfg = Release|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|Win32.Build.0 = Release|Win32
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|x64.ActiveCfg = Release|x64
-		{597742E7-328E-4862-ABC5-C1285CC101AB}.Release|x64.Build.0 = Release|x64
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Mixed Platforms.Build.0 = Debug|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Win32.ActiveCfg = Debug|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|Win32.Build.0 = Debug|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|x64.ActiveCfg = Debug|x64
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Debug|x64.Build.0 = Debug|x64
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Mixed Platforms.Build.0 = Release|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Win32.ActiveCfg = Release|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|Win32.Build.0 = Release|Win32
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|x64.ActiveCfg = Release|x64
-		{06220C36-06A0-4C67-A543-8C9CFC038FC6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BFA5A313-E275-44E2-9C05-F336533CB5AA}
 	EndGlobalSection
 EndGlobal

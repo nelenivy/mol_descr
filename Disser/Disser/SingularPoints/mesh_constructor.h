@@ -18,6 +18,8 @@ public:
 	MeshKeeper() { }
 	void ConstructMesh(const std::vector<cv::Point3d>& vertices, const std::vector<cv::Point3d>& normals, const std::vector<cv::Point3i>& triangles);
 	const Mesh& GetMesh() {return m_mesh; }
+	const std::vector<Vertice>& GetRawVertices() { return m_vertices; }
+	const std::vector<cv::Point3i>& GetRawTriangles() { return m_triangles_with_indexes; }
 private:
 	MeshKeeper(const MeshKeeper&){};
 	MeshKeeper& operator=(const MeshKeeper&){};

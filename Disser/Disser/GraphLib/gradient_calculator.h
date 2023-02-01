@@ -232,7 +232,7 @@ public:
 		m_hessian_map_y.SetGraph(graph);
 		m_hessian_det_x.SetGraph(graph);
 		m_hessian_det_y.SetGraph(graph);
-		//m_coord_sphere_basis_map.SetGraph(graph);
+		m_coord_sphere_basis_map.SetGraph(graph);
 		const int prev_threads_num = omp_get_num_threads();
 		omp_set_num_threads(threads_num);
 		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor> vertices_ids(vertices(graph).first, vertices(graph).second);
@@ -285,13 +285,9 @@ public:
 		CopyPoint_ToCol(phi_vect, 0, new_basis);
 		CopyPoint_ToCol(theta_vect, 1, new_basis);
 		CopyPoint_ToCol(r_vect, 2, new_basis);
-		//if (cent_vert == 30)
-		{
-			//std::cout<<new_basis<<m_coord_sphere_basis_map[cent_vert];
-		}
-		CV_Assert(new_basis.type() ==m_coord_sphere_basis_map[cent_vert].type());
+		CV_Assert(new_basis.type() == m_coord_sphere_basis_map[cent_vert].type());
 		//m_coord_sphere_basis_map[cent_vert].create(3,3);
-		//new_basis.copyTo(m_coord_sphere_basis_map[cent_vert]);
+		new_basis.copyTo(m_coord_sphere_basis_map[cent_vert]);
 		//Fill x and  coords in neighbouring vertices
 		std::vector<typename boost::graph_traits<Graph>::vertex_descriptor> vertices_within_dist;
 		GetVerticesWithinDistPlusAdjacent(cent_vert, graph, dist_map, dist_thresh, vertices_within_dist);

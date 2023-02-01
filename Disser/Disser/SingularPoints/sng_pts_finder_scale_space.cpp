@@ -7,6 +7,7 @@
 #include "SingularPoints/mesh_types.h"
 #include "SingularPoints\mesh_operations.h"
 #include "SingularPoints\pca_projections.h"
+#include "SingularPoints/visualizer.h"
 #include "GraphLib\connected_components_segmentator.h"
 #include "GraphLib\graph_operations.h"
 #include "GraphLib\graph_filter.h"
@@ -65,6 +66,7 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	ReadParamFromCommandLineWithDefault(argc, argv, "-use_central_projector", m_use_central_projector, false);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-filter_by_eigenvalues", m_filter_by_eigenvalues, false);
 	ReadParamFromCommandLineWithDefault(argc, argv, "-use_spherical", m_use_spherical, false);
+	ReadParamFromCommandLineWithDefault(argc, argv, "-visualize", m_visualize, false);
 	std::string detector_type_name;
 	ReadParamFromCommandLineWithDefault(argc, argv, "-detector_type", detector_type_name, std::string("hess_det"));
 	m_detector_type = StringToDetectorFunctionType(detector_type_name);
@@ -120,7 +122,7 @@ void SngPtsFinderScaleSpace::InitParams(int argc, char** argv)
 	const bool kAdditive = false;
 	const double d_mult_sigma = pow(m_sigma_max / m_init_curv_sigma, 1.0 / (m_sing_pts_levels_num));
 	std::cout << "d_mult_sigma " << d_mult_sigma << std::endl;
-	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive, false, 0.5);
+	m_scale_space_blurrer.Init(m_init_curv_sigma, d_mult_sigma, 0.0, kAdditive, false, 0.25);
 }
 
 template <typename Graph, typename PropMap>
@@ -522,10 +524,10 @@ void SngPtsFinderScaleSpace::CalcScaleSpaceHessian()
 					for (auto curr_vertice = vertices(Vertices()).first, end_vertices = vertices(Vertices()).second; 
 						curr_vertice != end_vertices; ++curr_vertice)
 					{
-						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x[*curr_vertice] *= sqrt(0.01 * m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
-						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y[*curr_vertice] *= sqrt(0.01 * m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
-						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_x[*curr_vertice] *= 0.01 * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
-						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_y[*curr_vertice] *= 0.01 * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x[*curr_vertice] *= sqrt(0.01) * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_map_y[*curr_vertice] *= sqrt(0.01) * m_scale_space_blurrer.GetSigma(curr_level);// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_x[*curr_vertice] *= 0.01 * Sqr(m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
+						m_spherical_hessian_map_calculators[curr_level].m_hessian_det_y[*curr_vertice] *= 0.01 * Sqr(m_scale_space_blurrer.GetSigma(curr_level));// rescale the hessian
 					}
 					
 					m_hessian_spherical[curr_level][2 * curr_prop] = m_spherical_hessian_map_calculators[curr_level].m_hessian_map_x;
@@ -859,8 +861,9 @@ void SngPtsFinderScaleSpace::CalcManifoldTraceBlobResponse()
 		}
 		
 		
-		//post-filter		
-		MedianKernelDist<double> med_kernel(0.3);
+		//post-filter	
+		double kernel_rad = m_use_spherical ? 0.3 : 0.3;
+		MedianKernelDist<double> med_kernel(kernel_rad);
 		input_tr_br[0] = m_manifold_trace_blob_response[curr_level];
 		FilterMeshWeightedFuncMultiThread(Vertices(), Triangles(), m_vert_vert_dist, m_vert_tr_dist, 
 			input_tr_br, true, 8,	med_kernel, filtered_tr_br);
@@ -897,7 +900,7 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 		if (m_use_spherical)
 		{
 			//m_scale_space_blurrer.MakeScaleSpaceSphericalHeatEq(Vertices(), m_vert_vert_dist, 
-				//m_coord_map, m_tangent_basis_map, m_input_spherical_prop_map, 
+				//m_coord_map, m_tangent_basis_map_inv, m_input_spherical_prop_map, 
 				//m_scale_space_levels_num, 1.0, m_output_spher_scale_space);
 			m_scale_space_blurrer.MakeScaleSpaceSpherical(Vertices(), m_vert_vert_dist, Triangles(), m_vert_tr_dist, m_input_spherical_prop_map, 
 				m_scale_space_levels_num, m_output_spher_scale_space);
@@ -1073,7 +1076,12 @@ void SngPtsFinderScaleSpace::CalcSingPtsFromCurvatureScales()
 	}
 	m_maximums = points_keeper.Points();
 
-	std::cout << "maximums " << m_maximums.size() << " ";	
+	std::cout << "maximums " << m_maximums.size() << " ";
+
+	if (m_visualize)
+	{
+		VisualizeSphereMapsWithSngPts();
+	}	
 }
 
 void SngPtsFinderScaleSpace::ResccaleInputFunctions()
@@ -1419,6 +1427,44 @@ void SngPtsFinderScaleSpace::FindSingPtsAsMaximumsOfScaleSpace()
 		std::cout <<points_keeper_curr_scale.Points().size() << "\n";
 	}
 }
+
+void SngPtsFinderScaleSpace::VisualizeSphereMaps()
+{
+	for (int prop = 0; prop < m_output_spher_scale_space.size(); ++prop)
+	{
+		for (int lev = 0; lev < m_output_spher_scale_space[prop].size(); ++lev)
+		{
+			VisualizeSphereMap(m_mesh_keeper.GetRawVertices(), m_mesh_keeper.GetRawTriangles(), m_output_spher_scale_space[prop][lev]);
+		}
+	}
+	
+}
+
+void SngPtsFinderScaleSpace::VisualizeSphereMapsWithSngPts()
+{
+	const size_t levels_num = m_maximums_with_levels.size();
+	CV_Assert(levels_num == m_sing_pts_levels_num);
+	
+	for (int lev = 0; lev < m_maximums_with_levels.size(); ++lev)
+	{
+		const auto& curr_prop_maps = m_output_spher_scale_space[lev + m_diff_btwn_sng_pts_lvls_and_scl_spc_lvls];
+		const std::vector<VertexDescriptor>& curr_maximums = m_maximums_with_levels[lev];
+		std::vector<cv::Point3d> sing_pts(curr_maximums.size());
+
+		for (int i = 0; i < curr_maximums.size(); ++i)
+		{
+			const VertexDescriptor curr_descr = curr_maximums[i];
+			sing_pts[i] = m_coord_map[curr_descr];
+		}
+
+		for (int prop = 0; prop < curr_prop_maps.size(); ++prop)
+		{
+			const auto& curr_prop_map = curr_prop_maps[prop];			
+			VisualizeSphereMapWithSingPts(m_mesh_keeper.GetRawVertices(), m_mesh_keeper.GetRawTriangles(), curr_prop_map, sing_pts);
+		}
+	}
+}
+
 
 std::vector<double> SngPtsFinderScaleSpace::GetSigmaValues()
 {

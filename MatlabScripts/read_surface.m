@@ -1,4 +1,4 @@
-function [vertice_matrix, face_matrix, prop_matrix] = read_surface(triangles_file, prop_file, double_prop)
+function [vertice_matrix, face_matrix, prop_matrix] = read_surface(triangles_file, prop_file, double_prop, sphere_prop)
 
 fid=fopen(triangles_file,'r');
 

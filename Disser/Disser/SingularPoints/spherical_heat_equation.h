@@ -26,10 +26,10 @@ public:
 	template <class Graph, class CoordMap, class DistanceMap,class TangentBasisMap>
 	void ProcessIteration(const Graph& graph, const CoordMap& coord_map, 
 		const SphereMap& prev_iter_func, const DistanceMap& dist_map, const double dist_thresh,
-		const TangentBasisMap& tangent_basis_map, const double delta_t, SphereMap& curr_iter_func)
+		const TangentBasisMap& tangent_basis_map_inv, const double delta_t, SphereMap& curr_iter_func)
 	{
 		curr_iter_func.SetGraph(graph);
-		m_hessian_calculator.Process(graph, coord_map, prev_iter_func, dist_map, dist_thresh, tangent_basis_map, 8);
+		m_hessian_calculator.Process(graph, coord_map, prev_iter_func, dist_map, dist_thresh, tangent_basis_map_inv, 8);
 
 		for (auto curr_vert = vertices(graph).first, end_vert = vertices(graph).second; curr_vert != end_vert; ++curr_vert)
 		{
@@ -49,7 +49,7 @@ public:
 			cv::Mat_<double> old_coord = curr_coord_sys * new_coord;
 			curr_iter_func[*curr_vert].x = old_coord(0);
 			curr_iter_func[*curr_vert].y = old_coord(1);
-			curr_iter_func[*curr_vert].z = old_coord(1);
+			curr_iter_func[*curr_vert].z = old_coord(2);
 			//std::cout << old_coord;
 		}
 	}

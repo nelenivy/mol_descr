@@ -800,8 +800,8 @@ size_t MoleculeManager::GetTriplesTypeNumLevels()
 
 size_t MoleculeManager::GetPointsTypeNum()
 {
-	CV_Assert(!m_lennard_jones_threshes.empty());
-	CV_Assert(!m_charge_threshes.empty());
+	//CV_Assert(!m_lennard_jones_threshes.empty());
+	//CV_Assert(!m_charge_threshes.empty());
 	return kSaddleType * (m_lennard_jones_threshes.size() + 1) * (m_charge_threshes.size() + 1) * (m_area_threshes.size() + 1);
 }
 
@@ -1065,7 +1065,8 @@ int MoleculeManager::CalculateSingularPointsTypes(PropertiesSet& prop)
 	type_with_max[CURVATURE].range = curvature_range;
 	type_with_max[AREA].range = area_range;
 
-	//const size_t curr_sign = Sign(m_vertex_charge_map[*iter]) + 1;
+	//int curr_sign = Sign(static_cast<double>(prop.ElectricPotential()));
+	//curr_sign = curr_sign <= 0 ? 0 : 1;
 	const int curr_sign = CalculateType(static_cast<double>(prop.ElectricPotential()), m_charge_threshes);
 	prop.Charge() = curr_sign;
 	type_with_max[SIGN].type = curr_sign;

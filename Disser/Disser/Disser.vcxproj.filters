@@ -137,6 +137,9 @@
     <ClInclude Include="SingularPoints\spherical_heat_equation.h">
       <Filter>SingularPoints</Filter>
     </ClInclude>
+    <ClInclude Include="SingularPoints\visualizer.h">
+      <Filter>SingularPoints</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="SingularPoints">

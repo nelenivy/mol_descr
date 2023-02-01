@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 	//manager.ProcessKernelSVMPointsWithFiltering();
 	//manager.ProcessTriples(true);
 	//manager.ProcessMGUASVMRegression();
-	manager.ProcessSVMClassificationL0();
+	//manager.ProcessSVMClassificationL0();
 	//manager.ProcessMGUASVMClassification(mgua_iterations_num, mgua_descriptors_num);
 	//manager.ProcessDescriptorsSVM();
 	//manager.ProcessKernelSVMPoints();

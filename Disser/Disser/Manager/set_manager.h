@@ -5,7 +5,7 @@
 #include "opencv2/core/core.hpp"
 #include "../Common/singular_point.h"
 #include "molecule_manager.h"
-#include "../../SVM/mgua.h"
+//#include "../../SVM/mgua.h"
 
 namespace molecule_descriptor
 {
@@ -21,13 +21,13 @@ public:
 	void ProcessPairsLevels(const bool calculate);
 	void ProcessTriples(const bool calculate);
 	void ProcessTriplesLevels(const bool calculate);
-	void ProcessKernelSVMPoints();
-	void ProcessKernelSVMPointsWithFiltering();
-	void ProcessKernelSVMHistograms();
-	void ProcessDescriptorsSVM();
-	void ProcessSVMClassificationL0();
-	void ProcessMGUASVMClassification(const int iter_num, const int descr_num);
-	void ProcessMGUASVMRegression();
+	//void ProcessKernelSVMPoints();
+	//void ProcessKernelSVMPointsWithFiltering();
+	//void ProcessKernelSVMHistograms();
+	//void ProcessDescriptorsSVM();
+	//void ProcessSVMClassificationL0();
+	//void ProcessMGUASVMClassification(const int iter_num, const int descr_num);
+	//void ProcessMGUASVMRegression();
 private:
 	void ReadParamsFromCommandLine(int argc, char** argv);
 	void FindOutMoleculesNum();
@@ -73,7 +73,7 @@ private:
 	std::vector<float> m_for_large_matrix_1;
 	std::vector<float> m_for_large_matrix_2;
 
-	MGUATrainer<unsigned int> m_mgua_trainer;
+	//MGUATrainer<unsigned int> m_mgua_trainer;
 
 	std::string m_command_line;
 };

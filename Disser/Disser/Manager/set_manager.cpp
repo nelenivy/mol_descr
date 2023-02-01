@@ -9,8 +9,8 @@
 #include <limits>
 
 #include "opencv2/core/core.hpp"
-#include "shark\LinAlg\BLAS\matrix.hpp"
-#include "shark/Models/Kernels/LinearKernel.h"
+//#include "shark\LinAlg\BLAS\matrix.hpp"
+//#include "shark/Models/Kernels/LinearKernel.h"
 
 #include "extensions.h"
 #include "InputOutput/params_reader.h"
@@ -20,13 +20,13 @@
 #include "types_calculation.h"
 #include "SingularPoints/i_singular_points_finder.h"
 
-#include "../../SVM/kernel_svm_trainer_manager.h"
-#include "../../SVM/descriptor_svm_trainer.h"
-#include "../../SVM/cross_validation_svm_trainer.h"
-#include "../../SVM/pharm_kernel_naive_configure.h"
+//#include "../../SVM/kernel_svm_trainer_manager.h"
+//#include "../../SVM/descriptor_svm_trainer.h"
+//#include "../../SVM/cross_validation_svm_trainer.h"
+//#include "../../SVM/pharm_kernel_naive_configure.h"
 
-#include "../../SVM/Kernels/basic_kernels.h"
-#include "../../SVM/Kernels/kernels_for_points.h"
+//#include "../../SVM/Kernels/basic_kernels.h"
+//#include "../../SVM/Kernels/kernels_for_points.h"
 namespace molecule_descriptor
 {
 
@@ -435,6 +435,7 @@ void SetManager::ProcessTriples(const bool calculate)
 	WriteMatrix(m_md_matrix, m_mol_folder + m_mol_prefix + Extensions::TriplesMDMatrix());
 }
 
+/*
 void SetManager::ProcessKernelSVMPoints()
 {
 	std::vector<std::vector<NonMarkedSingularPoint>> pts(m_molecules_num);
@@ -455,11 +456,11 @@ void SetManager::ProcessKernelSVMPoints()
 	}
 
 	std::vector<unsigned int> unsigned_labels(labels.begin(), labels.end());
-	typedef TriangleKernel/*AlwaysOneKernel<float>*/ PotentialKernel;
-	typedef KernelForParametersSet<DiracKernel<size_t>, /*AlwaysOneKernel*/DiracKernel<int>, PotentialKernel> kernel_type;	
+	typedef TriangleKernel PotentialKernel;
+	typedef KernelForParametersSet<DiracKernel<size_t>, DiracKernel<int>, PotentialKernel> kernel_type;	
 	PotentialKernel potential_kernel(0.2);//(0.020, -1.0, 1.0);
 	kernel_type tuple_kernel(
-		DiracKernel<size_t>(),/*AlwaysOneKernel*/DiracKernel<int>(), potential_kernel);
+		DiracKernel<size_t>(),DiracKernel<int>(), potential_kernel);
 	KernelSVMTrainerManager<PropertiesSet, GaussianKernelOneDim, kernel_type> svm_trainer;
 	svm_trainer.SetData(pts, unsigned_labels);
 	std::cout << tuple_kernel.parameterVector();
@@ -467,20 +468,21 @@ void SetManager::ProcessKernelSVMPoints()
 	svm_trainer.Train(m_mol_folder + m_mol_prefix);
 	svm_trainer.Write(m_mol_folder + m_mol_prefix);
 }
-
+*/
+/*
 void SetManager::ProcessKernelSVMPointsWithFiltering()
 {	//Calculate good descriptors
 	ProcessMGUASVMClassification(1, 1);
 	const size_t descriptors_arr[] = {1369, 1542, 1381};//,
-	/*1295, 157, 1009, 1048, 118, 38,
-	1038, 14, 128, 176, 872, 135,
-	901, 37, 271, 1048, 118, 38, 
-	1157, 180, 1009, 1048, 118, 38,
-	185, 6, 116, 1048, 118, 38,
-	180, 157, 1009, 1048, 118, 38 ,
-	415, 157, 1009, 1048, 118, 38,
-	1053, 14, 128, 176, 872, 135,
-	1295, 258, 128, 176, 872, 135};*/
+	//1295, 157, 1009, 1048, 118, 38,
+	//1038, 14, 128, 176, 872, 135,
+	//901, 37, 271, 1048, 118, 38, 
+	//1157, 180, 1009, 1048, 118, 38,
+	//185, 6, 116, 1048, 118, 38,
+	//180, 157, 1009, 1048, 118, 38 ,
+	//415, 157, 1009, 1048, 118, 38,
+	//1053, 14, 128, 176, 872, 135,
+	//1295, 258, 128, 176, 872, 135};
 	
 	const size_t kGoodSize = sizeof(descriptors_arr) / sizeof(descriptors_arr[0]);
 	std::vector<bool> good_descriptors = m_mgua_trainer.GetGoodDescriptors();	
@@ -533,12 +535,12 @@ void SetManager::ProcessKernelSVMPointsWithFiltering()
 	}
 	//////////////////////////////////////////////////////////////////////////
 	//get trainer
-	typedef /*AlwaysOneKernel<float>*/TriangleKernel PotentialKernel;
-	typedef KernelForParametersSet<DiracKernel<size_t>, /*AlwaysOneKernel*/DiracKernel<int>, PotentialKernel> kernel_type;	
+	typedef TriangleKernel PotentialKernel;
+	typedef KernelForParametersSet<DiracKernel<size_t>, DiracKernel<int>, PotentialKernel> kernel_type;	
 	PotentialKernel potential_kernel(0.03);//, -1.0, 1.0);
 	kernel_type tuple_kernel(
-		DiracKernel<size_t>(),/*AlwaysOneKernel*/DiracKernel<int>(), potential_kernel);
-	auto trainer = GetNaiveKernelSVMTrainerForClassification<PropertiesSet>(tuple_kernel, GaussianKernelOneDim(0.3/*m_dist_thresholds*/));
+		DiracKernel<size_t>(),DiracKernel<int>(), potential_kernel);
+	auto trainer = GetNaiveKernelSVMTrainerForClassification<PropertiesSet>(tuple_kernel, GaussianKernelOneDim(0.3));
 	std::vector<double> min(2);
 	std::vector<double> max(2);
 	std::vector<size_t> sections(2);
@@ -585,7 +587,9 @@ void SetManager::ProcessKernelSVMPointsWithFiltering()
 
 	trainer.train(labeled_data, labeled_data.numberOfElements() / 2);
 }
+*/
 
+/*
 void SetManager::ProcessDescriptorsSVM()
 {
 	//read MD matrix
@@ -606,9 +610,9 @@ void SetManager::ProcessDescriptorsSVM()
 	svm_trainer.Train(m_mol_folder + m_mol_prefix);
 	svm_trainer.Write(m_mol_folder + m_mol_prefix);
 }
+*/
 
-
-
+/*
 void SetManager::ProcessMGUASVMClassification(const int iter_num, const int descr_num)
 {
 	//read MD matrix
@@ -647,7 +651,9 @@ void SetManager::ProcessMGUASVMClassification(const int iter_num, const int desc
 	//m_mgua_trainer.TrainOneSet(svm_vect[0], m_mol_folder + m_mol_prefix);
 	m_mgua_trainer.Train(svm_vect, m_mol_folder + m_mol_prefix,true);
 }
+*/
 
+/*
 void SetManager::ProcessSVMClassificationL0()
 {
 	
@@ -660,7 +666,7 @@ void SetManager::ProcessSVMClassificationL0()
 	{
 		molecule_descriptor::ReadMatrix(m_md_matrix_double, md_mat_name);
 	}
-
+	std::cout << m_md_matrix_double.cols << " " << m_md_matrix_double.rows << std::endl;
 	if (1)
 	{//Normalize columns 
 		for (int x = 0; x < m_md_matrix_double.cols; ++x)
@@ -764,7 +770,7 @@ void SetManager::ProcessSVMClassificationL0()
 			//train new weights
 			auto balanced_data = PrepareDataForSVM(temp.begin(), temp.end(), unsigned_labels.begin(), unsigned_labels.end());
 			shark::LinearClassifier<shark::RealVector> model;
-			/*const double err = */svm_trainer.train(model, balanced_data);
+			svm_trainer.train(model, balanced_data);
 			std::vector<double> new_weights(model.parameterVector().begin(), model.parameterVector().end());
 			//calculate new weights characteristics
 			CV_Assert(new_weights.size() == weights.size());
@@ -780,7 +786,7 @@ void SetManager::ProcessSVMClassificationL0()
 				changes += (abs(new_weights[ind]) <= 0.0 && abs(old_weights[ind]) > 0.0);
 			}
 			non_changed_iterations = changes > 0 ? 0 : non_changed_iterations + 1;
-			std::cout << changes << " " << non_zero_weight << " " << diff << " " << diff /norm /*<< err */<< "\n";
+			std::cout << changes << " " << non_zero_weight << " " << diff << " " << diff /norm << "\n";
 			//write new weights, delete zero weights
 			non_zero_weight = 0;
 			for (size_t ind = 0; ind < weights.size(); ++ind)
@@ -848,13 +854,13 @@ void SetManager::ProcessSVMClassificationL0()
 			}
 
 			f << "precision = " << 1.0 - err;
-			/*f << " recall = " << base_descr_set[ind].recall;
-			f << " f_measure = " << base_descr_set[ind].FMeasure();*/
+			
 			f << "\n";
 	}
 }
+*/
 
-
+/*
 void SetManager::ProcessMGUASVMRegression()
 {
 	//read MD matrix
@@ -889,8 +895,7 @@ void SetManager::ProcessMGUASVMRegression()
 	}
 
 	MGUATrainer<shark::RealVector> mgua_trainer;
-	/*cv::Mat_<double> md_mat(m_md_matrix.size());
-	std::copy(m_md_matrix.begin(), m_md_matrix.end(), md_mat.begin());*/
+	
 	std::vector<shark::RealVector> labels_shark(labels.size(), shark::RealVector(1));
 	for (size_t ind = 0; ind < labels_shark.size(); ++ind)
 	{
@@ -900,7 +905,7 @@ void SetManager::ProcessMGUASVMRegression()
 	mgua_trainer.SetParameters(20, 6);
 	mgua_trainer.Train(svm_vect, m_mol_folder + m_mol_prefix, false);
 }
-
+*/
 std::string SetManager::MakeMoleculePrefix(const int ind)
 {
 	std::stringstream curr_file_prefix;
